@@ -9,12 +9,20 @@ window.title('AES')        # title
 #window.iconbitmap('.ico')  # setting icon (restricted .ico files)
 
 
+#NOTE:
+'''
+Send area
+-clear file button
+-show button
+-connected light
+'''
+
 frame_1=Frame(window)
 frame_1.pack()
 
 
-kb_limit=100
-total_kb=130
+kb_limit=100    #file space limit
+total_kb=130    #total memory space
 file_path=''
 
 
@@ -37,17 +45,23 @@ def file_size():        #get sile size
     fs_kb=file_size/1024    #conversion kb
     print(f"File size: {file_size} bytes ({fs_kb:2f} KB)")
     if fs_kb>kb_limit:
-        send_gui_file_1=Label(send_gui,text="*File Size Out of Range*",fg="red",font=('Arial'))
-        send_gui_file_1.grid(row=2,column=2)
+        #send_gui_file_1=Label(send_gui,text="*File Size Out of Range*",fg="red",font=('Arial'))
+        send_gui_file_2=Text(send_gui,fg="red",font=('Arial'),width=20,height=1)        #setting format
+        send_gui_file_2.insert(END,"*File Size Out of Range*")      #clue text
+        send_gui_file_2.config(state=DISABLED)
+        send_gui_file_2.grid(row=2,column=2)
+
         send_gui_button=Button(send_gui,text="Submit",command=send_submit,height=3,width=16,state=DISABLED)
         send_gui_button.grid(row=1,column=4)
         send_gui_file_2=Label(send_gui,text=f"{fs_kb:.2f} KB used({fs_kb/total_kb*100:.2f}%)",fg="red")
         send_gui_file_2.grid(row=2,column=4)
     else:
-        send_gui_file_1=Label(send_gui,text="                                   ",fg="red",font=('Arial'))
-        send_gui_file_1.grid(row=2,column=2)
+        send_gui_file_2=Text(send_gui,fg="red",font=('Arial'),width=20,height=1,state=DISABLED)
+        send_gui_file_2.grid(row=2,column=2)
+
         send_gui_button=Button(send_gui,text="Submit",command=send_submit,height=3,width=16,state=NORMAL)
         send_gui_button.grid(row=1,column=4)
+
         send_gui_file_2=Label(send_gui,text=f"{fs_kb:.2f} KB used({fs_kb/total_kb*100:.2f}%)")
         send_gui_file_2.grid(row=2,column=4)
 
@@ -71,8 +85,8 @@ send_gui_file_1.grid(row=0,column=2)
 send_gui_button=Button(send_gui,text="File",command=file_show,height=2,width=16)
 send_gui_button.grid(row=1,column=2)
 
-send_gui_file_1=Label(send_gui,text="")
-send_gui_file_1.grid(row=2,column=2)
+send_gui_file_2=Text(send_gui,fg="red",font=('Arial'),width=20,height=1,state=DISABLED)
+send_gui_file_2.grid(row=2,column=2)
 
 send_gui_txt_2=Label(send_gui,text="    ")
 send_gui_txt_2.grid(row=1,column=3)
