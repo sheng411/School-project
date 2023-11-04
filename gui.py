@@ -35,6 +35,16 @@ def send_submit():
 def file_show():
     global file_path
     file_path=filedialog.askopenfilename()
+    if file_path.lower().endswith(('.jpg', '.jpeg')):
+        with open(file_path, 'rb') as file:
+            #file_data = file.read()
+            #print(f"{file_data}")
+            '''
+            client_socket.send(b'file')
+            client_socket.send(file_data)
+            '''
+    else:
+        messagebox.showerror("Error", "Please select \" jpg \" or \" jpeg \" file.")
     print(file_path)
     file_size()
 
