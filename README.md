@@ -1,2 +1,2 @@
-# School-project
+# AES_project
 My school project
