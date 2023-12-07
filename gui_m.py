@@ -48,6 +48,15 @@ def send_submit():
     reception_gui_printtext.insert("1.0", data_text)        #Infromation to be put into
     reception_gui_printtext.configure(state="disabled")     #Disable Edit Mode
 
+def clear():
+    reception_gui_ciphertext.configure(state="normal")      #Editable mode
+    reception_gui_ciphertext.delete("1.0", END)             #Delete content
+    reception_gui_ciphertext.configure(state="disabled")    #Disable Edit Mode
+
+    reception_gui_printtext.configure(state="normal")       #Editable mode
+    reception_gui_printtext.delete("1.0", END)              #Delete content
+    reception_gui_printtext.configure(state="disabled")     #Disable Edit Mode
+
 
 send_gui=LabelFrame(frame_1,text="Send",font=label_font)
 send_gui.grid(row=1,column=0)
@@ -75,13 +84,13 @@ for widget in send_gui.winfo_children():        #spacing
 
 
 reception_gui=LabelFrame(frame_1,text="Reception",font=label_font)
-reception_gui.grid(row=2,column=0)
+reception_gui.grid(row=2,column=0,padx=20)
 
 
-reception_gui_prompts=Label(reception_gui,text="ciphertext text",font=label_font)    #ciphertext prompts
+reception_gui_prompts=Label(reception_gui,text="ciphertext",font=label_font)    #ciphertext prompts
 reception_gui_prompts.grid(row=0,column=0)
 
-reception_gui_prompts=Label(reception_gui,text="printtext text",font=label_font)    #printtext prompts
+reception_gui_prompts=Label(reception_gui,text="printtext",font=label_font)    #printtext prompts
 reception_gui_prompts.grid(row=0,column=2)
 
 
@@ -89,8 +98,11 @@ reception_gui_prompts.grid(row=0,column=2)
 reception_gui_ciphertext=Text(reception_gui,height=8,width=30,font=text_font)      #output area
 reception_gui_ciphertext.grid(row=1,column=0)
 
-reception_gui_text_out=Label(reception_gui,text="    ")
+
+reception_gui_text_out=Button(reception_gui,text="Clear",command=clear,height=1,width=10,font=label_font,bg="#ff0000")
 reception_gui_text_out.grid(row=1,column=1)
+#reception_gui_text_out=Label(reception_gui,text="    ")
+#reception_gui_text_out.grid(row=1,column=1)
 
 
 reception_gui_printtext=Text(reception_gui,height=8,width=30,font=text_font)      #output area
@@ -102,6 +114,6 @@ for widget in reception_gui.winfo_children():        #spacing
 
 
 '''     other   '''
-window.geometry("800x550")  #window size
+window.geometry("900x550")  #window size
 window.resizable(win_status,win_status)   # disable page size cheng
 window.mainloop()   #end
