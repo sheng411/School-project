@@ -1,5 +1,6 @@
 from tkinter import *
 from tkinter import ttk,filedialog,messagebox,font
+from connect import *
 import os
 
 window=Tk() #start
@@ -38,6 +39,7 @@ frame_1.pack(expand=True, fill="both",padx=20,pady=20)      #center
 def send_submit():
     data_text=send_gui_input.get("1.0", END)                #get input content
     print("Send input-->",data_text)
+    wifi_return=wifi_connect(data_text)
     reception_gui_ciphertext.configure(state="normal")      #Editable mode
     reception_gui_ciphertext.delete("1.0", END)             #Delete content
     reception_gui_ciphertext.insert("1.0", data_text)       #Infromation to be put into
@@ -45,7 +47,7 @@ def send_submit():
 
     reception_gui_printtext.configure(state="normal")       #Editable mode
     reception_gui_printtext.delete("1.0", END)              #Delete content
-    reception_gui_printtext.insert("1.0", data_text)        #Infromation to be put into
+    reception_gui_printtext.insert("1.0", wifi_return)        #Infromation to be put into
     reception_gui_printtext.configure(state="disabled")     #Disable Edit Mode
 
 def clear():
