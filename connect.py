@@ -7,7 +7,7 @@ ESP32_PORT = 1880
 def wifi_connect(message):
     # creating socket objects
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
+    
     # connect ESP32
     client_socket.connect((ESP32_IP, ESP32_PORT))
 
@@ -22,6 +22,8 @@ def wifi_connect(message):
 
     # close socket
     client_socket.close()
+    print("wifi disconnect")
+
     return "wifi ok->"+message
 
 # test
