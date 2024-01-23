@@ -5,7 +5,7 @@ import os
 
 window=Tk() #start
 
-window.title('AES')        # title
+window.title('AES_connect')        # title
 #window.iconbitmap('.ico')  # setting icon (restricted .ico files)
 
 
@@ -23,10 +23,7 @@ window.configure(bg="#87cefa")      #light blue
 
 #NOTE:
 '''
-Send area
--clear file button
--show button
--connected light
+update  line 42 and 47 data source
 '''
 
 frame_1=Frame(window)
