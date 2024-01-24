@@ -5,7 +5,7 @@ import os
 
 window=Tk() #start
 
-window.title('AES_connect')        # title
+window.title('AES_wifi_client')        # title
 #window.iconbitmap('.ico')  # setting icon (restricted .ico files)
 
 
@@ -37,24 +37,17 @@ def send_submit():
     data_text=send_gui_input.get("1.0", END)                #get input content
     print("Send input-->",data_text)
     wifi_return=wifi_connect(data_text)
-    reception_gui_ciphertext.configure(state="normal")      #Editable mode
-    reception_gui_ciphertext.delete("1.0", END)             #Delete content
-    reception_gui_ciphertext.insert("1.0", data_text)       #Infromation to be put into
-    reception_gui_ciphertext.configure(state="disabled")    #Disable Edit Mode
-
-    reception_gui_printtext.configure(state="normal")       #Editable mode
-    reception_gui_printtext.delete("1.0", END)              #Delete content
-    reception_gui_printtext.insert("1.0", wifi_return)        #Infromation to be put into
-    reception_gui_printtext.configure(state="disabled")     #Disable Edit Mode
+    print("wifi return->",wifi_return)
+    show_text(wifi_return,data_text)
 
 def clear():
     reception_gui_ciphertext.configure(state="normal")      #Editable mode
     reception_gui_ciphertext.delete("1.0", END)             #Delete content
     reception_gui_ciphertext.configure(state="disabled")    #Disable Edit Mode
 
-    reception_gui_printtext.configure(state="normal")       #Editable mode
-    reception_gui_printtext.delete("1.0", END)              #Delete content
-    reception_gui_printtext.configure(state="disabled")     #Disable Edit Mode
+    reception_gui_plaintext.configure(state="normal")       #Editable mode
+    reception_gui_plaintext.delete("1.0", END)              #Delete content
+    reception_gui_plaintext.configure(state="disabled")     #Disable Edit Mode
 
 
 send_gui=LabelFrame(frame_1,text="Send",font=label_font)
@@ -82,6 +75,18 @@ for widget in send_gui.winfo_children():        #spacing
 '''     reception GUI   '''
 
 
+def show_text(ciphert,plaint):
+    reception_gui_ciphertext.configure(state="normal")      #Editable mode
+    reception_gui_ciphertext.delete("1.0", END)             #Delete content
+    reception_gui_ciphertext.insert("1.0", ciphert)       #Infromation to be put into
+    reception_gui_ciphertext.configure(state="disabled")    #Disable Edit Mode
+
+    reception_gui_plaintext.configure(state="normal")       #Editable mode
+    reception_gui_plaintext.delete("1.0", END)              #Delete content
+    reception_gui_plaintext.insert("1.0", plaint)        #Infromation to be put into
+    reception_gui_plaintext.configure(state="disabled")     #Disable Edit Mode
+
+
 reception_gui=LabelFrame(frame_1,text="Reception",font=label_font)
 reception_gui.grid(row=2,column=0,padx=20)
 
@@ -89,7 +94,7 @@ reception_gui.grid(row=2,column=0,padx=20)
 reception_gui_prompts=Label(reception_gui,text="ciphertext",font=label_font)    #ciphertext prompts
 reception_gui_prompts.grid(row=0,column=0)
 
-reception_gui_prompts=Label(reception_gui,text="printtext",font=label_font)    #printtext prompts
+reception_gui_prompts=Label(reception_gui,text="plaintext",font=label_font)    #printtext prompts
 reception_gui_prompts.grid(row=0,column=2)
 
 
@@ -104,8 +109,8 @@ reception_gui_text_out.grid(row=1,column=1)
 #reception_gui_text_out.grid(row=1,column=1)
 
 
-reception_gui_printtext=Text(reception_gui,height=8,width=30,font=text_font)      #output area
-reception_gui_printtext.grid(row=1,column=2)
+reception_gui_plaintext=Text(reception_gui,height=8,width=30,font=text_font)      #output area
+reception_gui_plaintext.grid(row=1,column=2)
 
 
 for widget in reception_gui.winfo_children():        #spacing
