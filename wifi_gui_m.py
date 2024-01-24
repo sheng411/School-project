@@ -18,7 +18,7 @@ label_font=font.Font(family="Arial",size=12)
 
 
 #control contexts
-window.configure(bg="#87cefa")      #light blue
+window.configure(bg="#87cefa")      #light blue#8a2be2
 
 
 #NOTE:
