@@ -5,7 +5,7 @@ import os
 
 window=Tk() #start
 
-window.title('AES_wifi_client')        # title
+window.title('AES_serial_client')        # title
 #window.iconbitmap('.ico')  # setting icon (restricted .ico files)
 
 
