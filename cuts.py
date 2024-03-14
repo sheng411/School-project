@@ -1,3 +1,11 @@
+'''
+input type : string / int / float
+output type : list
+
+'''
+
+lenght=8
+
 def cuts_message(msg):
     m=[]
     ms_str=""
@@ -6,7 +14,7 @@ def cuts_message(msg):
     for i in msg:
         ms_str+=i
         count+=1
-        if count == 16:
+        if count == lenght:
             m.append(ms_str)
             count=0
             ms_str=""  # reset string
@@ -14,10 +22,10 @@ def cuts_message(msg):
     if count > 0:
         m.append(ms_str)
 
-    print(m)
+    return m
 
-'''
+
 # test
 inp = input("->")
-cuts_message(inp)
-'''
+print(cuts_message(inp))
+''''''
