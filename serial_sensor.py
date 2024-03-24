@@ -1,25 +1,38 @@
 import serial
 
-ser = serial.Serial('COM4', 115200)
+ser = serial.Serial('COM9', 115200)
 
-print("Turn on reception")
-try:
-    while True:
+
+def serial_send_data(data):
+    try:
+        print(f"Sending data: {data}")
+        ser.write(data.encode('UTF-8'))  # Encode data to bytes for serial transmission
+
+    except serial.SerialException as e:
+        print(f"Serial port error: {e}")
+    return data
+
+
+def serial_listen_function():
+    print("Turn on reception")
+    for i in range(1):
         # get data and decode
-        data = ser.readline().decode('utf-8').rstrip()
-
+        data = ser.readline().decode('UTF-8').rstrip()
         # show data
-        print(data)
-
+        #print(data)
         # check the keyword "close"
+        '''
         if data.lower() == "close":
             print("received 'close' ,Shutting down the serial port....")
             break
+        '''
+        return data
 
-except Exception as e:
-    print(f"Exceptions occur: {e}")
 
-finally:
-    if ser.is_open:
-        ser.close()
-        print("Serial port closed")
+##test
+'''
+while True:
+    d=input("-->")
+    print(serial_send_data(d))
+    
+'''
