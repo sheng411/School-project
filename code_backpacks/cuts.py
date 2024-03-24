@@ -4,7 +4,7 @@ output type : list
 
 '''
 
-lenght=8
+lenght=100
 
 def cuts_message(msg):
     m=[]
@@ -24,8 +24,8 @@ def cuts_message(msg):
 
     return m
 
-
+'''
 # test
 inp = input("->")
 print(cuts_message(inp))
-''''''
+'''
