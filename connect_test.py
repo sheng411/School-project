@@ -1,6 +1,13 @@
 import socket
 import threading
 
+data = {
+    "name": "John",
+    "age": 30,
+    "city": "New York"
+}
+
+json_data = json.dumps(data)
 
 # setting the ESP32 address and port number
 ESP32_IP = '192.168.4.1'
@@ -24,6 +31,9 @@ def wifi_send():
 
         # send data to ESP32
         client_socket.sendall(data.encode())
+
+        # 傳送 JSON 資料
+        client_socket.sendall(json_data.encode())
 
         # receive data from ESP32
         data_return= client_socket.recv(1024)
