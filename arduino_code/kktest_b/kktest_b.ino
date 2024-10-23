@@ -15,14 +15,26 @@ WiFiClient client;
 
 void check_connect(){
     if(WiFi.status() != WL_CONNECTED){
-        digitalWrite(LED_BUILTIN,LOW);
+        led_toggle();
         Serial.println("Wifi disconnected,reconnect...");
         WiFi.begin(aSSID, aPassword);
         delay(100);
     }
     else{
-        digitalWrite(LED_BUILTIN,HIGH);
+        led_on();
     }
+}
+
+void led_on(){
+  digitalWrite(LED_PIN, HIGH);
+}
+
+void led_off(){
+  digitalWrite(LED_PIN, LOW);
+}
+
+void led_toggle() {
+  digitalWrite(LED_PIN, !digitalRead(LED_PIN));
 }
 
 void setup() {
@@ -31,7 +43,7 @@ void setup() {
     WiFi.begin(aSSID, aPassword);
 
     pinMode(LED_PIN, OUTPUT);
-    digitalWrite(LED_PIN, LOW);
+    led_off();
 
     while (WiFi.status() != WL_CONNECTED) {
         delay(1000);
