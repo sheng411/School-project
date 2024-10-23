@@ -19,10 +19,15 @@ void check_connect(){
         ck=0;
         led_toggle();
         Serial.println("Wifi disconnected,reconnect...");
-        WiFi.begin(aSSID, aPassword);
+        WiFi.begin(bSSID, bPassword);
         delay(100);
     }
-    else if(ck==0){
+    else{
+        led_on();
+    }
+
+    if(ck==0 && WiFi.status() == WL_CONNECTED){
+        Serial.println("\nReconnect OK\n");
         Serial.print("connect IP->");
         Serial.println(WiFi.localIP());
         Serial.print("connect ssid->");
@@ -30,9 +35,6 @@ void check_connect(){
         Serial.print("My IP->");
         Serial.println(WiFi.softAPIP());
         ck=1;
-    }
-    else{
-        led_on();
     }
 }
 
