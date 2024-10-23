@@ -14,11 +14,22 @@ const int bServerPort = 80;
 WiFiClient client;
 
 void check_connect(){
+    int ck=1;
     if(WiFi.status() != WL_CONNECTED){
+        ck=0;
         led_toggle();
         Serial.println("Wifi disconnected,reconnect...");
-        WiFi.begin(bSSID, bPassword);
+        WiFi.begin(aSSID, aPassword);
         delay(100);
+    }
+    else if(ck==0){
+        Serial.print("connect IP->");
+        Serial.println(WiFi.localIP());
+        Serial.print("connect ssid->");
+        Serial.println(WiFi.SSID());
+        Serial.print("My IP->");
+        Serial.println(WiFi.softAPIP());
+        ck=1;
     }
     else{
         led_on();
@@ -26,15 +37,15 @@ void check_connect(){
 }
 
 void led_on(){
-  digitalWrite(LED_PIN, HIGH);
+    digitalWrite(LED_PIN, HIGH);
 }
 
 void led_off(){
-  digitalWrite(LED_PIN, LOW);
+    digitalWrite(LED_PIN, LOW);
 }
 
 void led_toggle() {
-  digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+    digitalWrite(LED_PIN, !digitalRead(LED_PIN));
 }
 
 void setup() {
@@ -70,7 +81,8 @@ void loop() {
         while (client.connected()) {
             if (client.available()) {
                 String message = client.readStringUntil('\n');
-                Serial.print("Message: ");
+                Serial.print(WiFi.SSID());
+                Serial.print(" : ");
                 Serial.println(message);
                 //client.println("Message received on A device: " + message);
             }
@@ -93,5 +105,5 @@ void loop() {
             }
         }
     }
-    delay(100);
+    delay(10);
 }
