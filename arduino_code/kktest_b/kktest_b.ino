@@ -2,18 +2,26 @@
 #include <WiFi.h>
 #include "ecc.h"
 #define LED_PIN LED_BUILTIN
-using namespace std;
 
 //local
 const char* ssid = "shESP32";
-const char* password = "987654321";
+const char* password = "1234567890";
 WiFiServer server(80);
 
 //connect
-const char* aSSID = "kkESP32";
-const char* aPassword = "987654321";
-const int aServerPort = 80;
+const char* c_SSID = "kkESP32";
+const char* c_Password = "1234567890";
+const int c_ServerPort = 80;
 WiFiClient client;
+
+void show_wifi_info(){
+    Serial.print("connect IP->");
+    Serial.println(WiFi.localIP());
+    Serial.print("connect ssid->");
+    Serial.println(WiFi.SSID());
+    Serial.print("My IP->");
+    Serial.println(WiFi.softAPIP());
+}
 
 void check_connect(){
     int ck=1;
@@ -21,7 +29,7 @@ void check_connect(){
         ck=0;
         led_toggle();
         Serial.println("Wifi disconnected,reconnect...");
-        WiFi.begin(aSSID, aPassword);
+        WiFi.begin(c_SSID, c_Password);
         delay(100);
     }
     else{
@@ -30,12 +38,7 @@ void check_connect(){
 
     if(ck==0 && WiFi.status() == WL_CONNECTED){
         Serial.println("\nReconnect OK\n");
-        Serial.print("connect IP->");
-        Serial.println(WiFi.localIP());
-        Serial.print("connect ssid->");
-        Serial.println(WiFi.SSID());
-        Serial.print("My IP->");
-        Serial.println(WiFi.softAPIP());
+        show_wifi_info();
         ck=1;
     }
 }
@@ -54,15 +57,22 @@ void led_toggle() {
 
 void ecc_receive_msg(){
     //a to b
+    Serial.println("Waiting for message from A...");
+    while (!server.hasClient()) {
+        delay(100);   // 等待A建立連接
+    }
     String message;
     WiFiClient client = server.available();
     if (client) {
         //Serial.println("Client connected");
         while (client.connected()) {
             if (client.available()) {
+                String message = client.readStringUntil('\n');
+                Serial.print("[ECC] ");
                 Serial.print(WiFi.SSID());
                 Serial.print(" : ");
                 Serial.println(message);
+                break;
                 //client.println("Message received on A device: " + message);
             }
         }
@@ -73,15 +83,14 @@ void ecc_receive_msg(){
 
 void ecc_send_msg(String message){
     //b to a
-    if (Serial.available() > 0) {
-        message.trim();
-        if (!message.isEmpty()) {
-            Serial.println("Sending to A:" + message);
-            if (client.connect(WiFi.gatewayIP(), aServerPort)) {
-                client.println(message);
-            } else {
-                Serial.println("Connection to A failed");
-            }
+    message.trim();
+    if (!message.isEmpty()) {
+        Serial.println("[ECC] Sending to A:" + message);
+        if (client.connect(WiFi.gatewayIP(), c_ServerPort)) {
+            client.println(message);
+            client.stop();
+        } else {
+            Serial.println("Connection to A failed");
         }
     }
 }
@@ -103,15 +112,13 @@ void ecc_connect(){
         str=str+str1[(D.x.a[i]>>j)&0x0f];
     }
 
-    for(int i=0;i<3;i++){
-        ecc_receive_msg();
-    }
-    
-    for(int i=0;i<3;i++){
-        ecc_send_msg(str);
-    }
+    ecc_receive_msg();
+
+    ecc_send_msg(str);
+
     Serial.println("ECC over-B");
 }
+
 void receive_msg(){
     //a to b
     WiFiClient client = server.available();
@@ -123,7 +130,6 @@ void receive_msg(){
                 Serial.print(WiFi.SSID());
                 Serial.print(" : ");
                 Serial.println(message);
-                //client.println("Message received on A device: " + message);
             }
         }
         client.stop();
@@ -138,7 +144,7 @@ void send_msg(){
         message.trim();
         if (!message.isEmpty()) {
             Serial.println("Sending to A:" + message);
-            if (client.connect(WiFi.gatewayIP(), aServerPort)) {
+            if (client.connect(WiFi.gatewayIP(), c_ServerPort)) {
                 client.println(message);
             } else {
                 Serial.println("Connection to A failed");
@@ -156,9 +162,8 @@ void setup() {
     makepowt(10,anT10)  ;
     makepowt(20,anT20)  ;
     makepowt(40,anT40)  ;
-    
     WiFi.softAP(ssid, password);
-    WiFi.begin(aSSID, aPassword);
+    WiFi.begin(c_SSID, c_Password);
 
     pinMode(LED_PIN, OUTPUT);
     led_off();
@@ -168,12 +173,7 @@ void setup() {
         Serial.println("Connecting to A WiFi...");
     }
 
-    Serial.print("connect IP->");
-    Serial.println(WiFi.localIP());
-    Serial.print("connect ssid->");
-    Serial.println(WiFi.SSID());
-    Serial.print("My IP->");
-    Serial.println(WiFi.softAPIP());
+    show_wifi_info();
     server.begin();
     ecc_connect();
 }
