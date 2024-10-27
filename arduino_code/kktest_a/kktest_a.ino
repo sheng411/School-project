@@ -11,12 +11,12 @@ using namespace std;
 //local
 const char* ssid = "kkESP32";
 const char* password = "1234567890";
-WiFiServer server(80);
+WiFiServer server(3559);
 
 //connect
 const char* c_SSID = "shESP32";
 const char* c_Password = "1234567890";
-const int c_ServerPort = 80;
+const int c_ServerPort = 3559;
 WiFiClient client;
 
 void show_wifi_info(){
