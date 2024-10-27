@@ -1,7 +1,12 @@
 //a
 #include <WiFi.h>
+#include <iostream>
+#include <string>
+#include <cstdlib>
 #include "ecc.h"
 #define LED_PIN LED_BUILTIN
+int ecc_key[16];
+using namespace std;
 
 //local
 const char* ssid = "kkESP32";
@@ -55,43 +60,63 @@ void led_toggle() {
     digitalWrite(LED_PIN, !digitalRead(LED_PIN));
 }
 
-void ecc_receive_msg(){
+String ecc_receive_msg(){
     //a to b
-    Serial.println("Waiting for message from A...");
+    Serial.println("Waiting for message from B...");
     while (!server.hasClient()) {
         delay(100);   // 等待B建立連接
     }
     String message;
     WiFiClient client = server.available();
     if (client) {
-        //Serial.println("Client connected");
         while (client.connected()) {
             if (client.available()) {
-                String message = client.readStringUntil('\n');
+                message = client.readStringUntil('\n');
                 Serial.print("[ECC] ");
                 Serial.print(WiFi.SSID());
                 Serial.print(" : ");
                 Serial.println(message);
                 break;
-                //client.println("Message received on B device: " + message);
             }
         }
         client.stop();
-        //Serial.println("Client disconnected");
     }
+    message.remove(message.length()-1);   //Delete "\n"
+    return message;
 }
 
 void ecc_send_msg(String message){
     //a to b
     message.trim();
     if (!message.isEmpty()) {
-        Serial.println("[ECC] Sending to A:" + message);
+        Serial.println("[ECC] Sending to B:" + message);
         if (client.connect(WiFi.gatewayIP(), c_ServerPort)) {
             client.println(message);
             client.stop();
         } else {
-            Serial.println("Connection to A failed");
+            Serial.println("Connection to B failed");
         }
+    }
+}
+
+void ecc_cut_key(String hex_string,int ecc_key[]){
+    String hex_string1;
+    Serial.print("hex_str-->");
+    Serial.println(hex_string);
+    for(int i=0;i<16;i++){
+        hex_string1 = hex_string.substring(hex_string.length()-2,hex_string.length());
+        Serial.print("hex_str1-->");
+        Serial.println(hex_string1);
+        int hex_value = strtoul(hex_string1.c_str(), NULL, 16);  // 將字串轉為16進位整數
+        Serial.print("hex_value-->");
+        Serial.println(hex_value);
+        ecc_key[i]=hex_value;
+        hex_string.remove(hex_string.length()-2);
+
+        Serial.print("ecc_key[");
+        Serial.print(i);
+        Serial.print("] = ");
+        Serial.println(ecc_key[i],HEX);
     }
 }
 
@@ -99,7 +124,16 @@ void ecc_connect(){
     points  G,Q,D;
     G.x={0xDE4E6D5E5C94EEE8,0x7BBC11ACAA07D793,0X2FE13C053};
     G.y={0x0536D538CCDAA3D9,0x5D38FF58321F2E80,0X289070FB0};
-    mbits K={0Xffffffffffffffff,0Xffffffffffffffff,0X7fffffffff};
+    mbits K;
+    for(int i=0;i<3;i++){
+        uint64_t rand;
+        rand=random(0x7fffffff);
+        K.a[i]=rand;
+        Serial.print("K[");
+        Serial.print(i);
+        Serial.print("] = ");
+        Serial.println(K.a[i]);
+    }
     D=scalarmA2(K,G);
     showword(D.x);
     showword(D.y);
@@ -113,9 +147,11 @@ void ecc_connect(){
     }
     
     ecc_send_msg(str);
-
-    ecc_receive_msg();
-
+    String re_str2;     //接收到的Key
+    re_str2=ecc_receive_msg();
+    Serial.print("re_str2-->");
+    Serial.println(re_str2);
+    ecc_cut_key(re_str2,ecc_key);
     Serial.println("ECC over-A");
 }
 
