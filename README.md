@@ -2,7 +2,7 @@
 Our School Programs
 
 ## Project name:
-#### NULL
+#### 優化AES與ECC運算效能於IoT裝置
 
 ## Supervising professor:
 #### Ph.D 陳延華
