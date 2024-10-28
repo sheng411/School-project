@@ -44,6 +44,7 @@ void check_connect(){
     if(ck==0 && WiFi.status() == WL_CONNECTED){
         Serial.println("\nReconnect OK\n");
         show_wifi_info();
+        ecc_connect();
         ck=1;
     }
 }
@@ -99,25 +100,67 @@ void ecc_send_msg(String message){
     }
 }
 
-void ecc_cut_key(String hex_string,int ecc_key[]){
+void ecc_cut_key(String hex_string,int ecc_key[], mbits K){
     String hex_string1;
+    int count=0;
+    
+    /* test message
     Serial.print("hex_str-->");
-    Serial.println(hex_string);
-    for(int i=0;i<16;i++){
-        hex_string1 = hex_string.substring(hex_string.length() - 2, hex_string.length());
-        Serial.print("hex_str1-->");
-        Serial.println(hex_string1);
-        int hex_value = strtoul(hex_string1.c_str(), NULL, 16);  // 將字串轉為16進位整數
-        Serial.print("hex_value-->");
-        Serial.println(hex_value);
-        ecc_key[i]=hex_value;
-        hex_string.remove(hex_string.length()-2);
+    Serial.println(hex_string);  //D*G
+    */
 
+    points DG;
+
+    for(int i=0;i<3;i++){
+        hex_string1 = hex_string.substring(hex_string.length()-16,hex_string.length());
+        uint64_t num = strtoull(hex_string1.c_str(), NULL, 16);
+        DG.y.a[i]=num;
+        hex_string.remove(hex_string.length()-16);
+    }
+
+    for(int i=0;i<3;i++){
+        hex_string1 = hex_string.substring(hex_string.length()-16,hex_string.length());
+        uint64_t num = strtoull(hex_string1.c_str(), NULL, 16);
+        DG.x.a[i]=num;
+        hex_string.remove(hex_string.length()-16);
+    }
+
+    /* test message
+    Serial.print("DG:");
+    for(int i=0;i<3;i++)
+        Serial.println(DG.x.a[i],HEX);
+    */
+    points KDG=scalarmA2(K,DG);
+    //showword(KDG.x);
+    //showword(KDG.y);
+
+    for(int i=0;i<2;i++){
+        count=0;
+        for(int j=8*i;j<8*(i+1);j++){
+        ecc_key[j]=((KDG.x.a[i]>>(8*count))&0xff);
+        count++;
+        }
+    }
+    /* test message(show ecc key)
+    for(int i=0;i<16;i++){
         Serial.print("ecc_key[");
         Serial.print(i);
         Serial.print("] = ");
         Serial.println(ecc_key[i],HEX);
     }
+    */
+}
+
+uint64_t getRandom64(){
+    uint64_t high = (uint64_t)random(0x7FFFFFFF) << 32;
+    uint64_t low = (uint64_t)random(0x7FFFFFFF);
+    return high | low;
+}
+
+uint64_t getRandom35(){
+    uint64_t high = (uint64_t)random(7) << 32;
+    uint64_t low = (uint64_t)random(0x7FFFFFFF);
+    return high | low;
 }
 
 void ecc_connect(){
@@ -125,18 +168,30 @@ void ecc_connect(){
     G.x={0xDE4E6D5E5C94EEE8,0x7BBC11ACAA07D793,0X2FE13C053};
     G.y={0x0536D538CCDAA3D9,0x5D38FF58321F2E80,0X289070FB0};
     mbits K;
-    for(int i=0;i<3;i++){
-        uint64_t rand;
-        rand=random(0x7fffffff);
+    //Serial.print("Random 64-bit number: 0x");
+    for(int i=0;i<2;i++){
+        uint64_t rand = getRandom64();
         K.a[i]=rand;
+      //Serial.print(rand,HEX);
+    }
+
+    uint64_t rand1 = getRandom35();
+    K.a[2]=rand1;
+    /* test message
+    Serial.println(rand1,HEX);
+    for(int i=0;i<3;i++){
         Serial.print("K[");
         Serial.print(i);
         Serial.print("] = ");
-        Serial.println(K.a[i]);
+        Serial.println(K.a[i],HEX);
     }
+    */
+
     D=scalarmA2(K,G);
+    /*
     showword(D.x);
     showword(D.y);
+    */
 
     int h;
     String str1[]={"0","1","2","3","4","5","6","7","8","9","A","B","C","D","E","F"};                   
@@ -145,13 +200,17 @@ void ecc_connect(){
         for(int j=(63-3);j>=0;j=j-4)
         str=str+str1[(D.x.a[i]>>j)&0x0f];
     }
+    for(int i=wsize-1;i>=0;i--){
+        for(int j=(63-3);j>=0;j=j-4)
+        str=str+str1[(D.y.a[i]>>j)&0x0f];
+    }
 
-    String re_str2;     //接收到的Key
-    re_str2=ecc_receive_msg();
-    Serial.print("re_str2-->");
-    Serial.println(re_str2);
     ecc_send_msg(str);
-    ecc_cut_key(re_str2,ecc_key);
+    String re_str2;     //接收到的D*G
+    re_str2=ecc_receive_msg();
+    //Serial.print("re_str2-->");
+    //Serial.println(re_str2);
+    ecc_cut_key(re_str2,ecc_key,K);
     Serial.println("ECC over-B");
 }
 
