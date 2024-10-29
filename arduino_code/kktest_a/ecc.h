@@ -14,47 +14,46 @@ uint64_t  mask=0x7FFFFFFFF;
 int       maskbits=35;
 
 struct mbits{
-   uint64_t a[wsize];
+  uint64_t a[wsize];
 };
 
 struct points{
- mbits x;
- mbits y; 
+  mbits x;
+  mbits y; 
 };
+
 points anT1[163];
 points anT2[163];
 points anT5[163];
 points anT10[163];
 points anT20[163];
 points anT40[163];
-int GFMT(int a, int b)
-{
-int m=8;  
-int p=27;
-int mask=pow(2,m)-1; 
-int c=0;
-for (int i=m-1;i>=1;i--)
-    {
+
+int GFMT(int a, int b){
+  int m=8;  
+  int p=27;
+  int mask=pow(2,m)-1; 
+  int c=0;
+  for (int i=m-1;i>=1;i--){
     c=c^(((a>>i)&0x01)*b);
     c=((c<<1)&mask)^(((c>>(m-1))&0x01)*p);  
-    }
-c=c^(a&0x01)*b;    
-return c;
+  }
+  c=c^(a&0x01)*b;    
+  return c;
 }
 
-mbits shift(mbits d, int s)
-{   if (s>=1)
-    {
- d.a[wsize-1]=((d.a[wsize-1]<<s)&mask)|(d.a[wsize-2]>>(64-s));
- for(int i=wsize-2;i>=1;i--)
-     d.a[i]=(d.a[i]<<s)|(d.a[i-1]>>(64-s));
- d.a[0]=d.a[0]<<s;
-    }
-    return d;
+mbits shift(mbits d, int s){
+  if (s>=1){
+    d.a[wsize-1]=((d.a[wsize-1]<<s)&mask)|(d.a[wsize-2]>>(64-s));
+    for(int i=wsize-2;i>=1;i--)
+      d.a[i]=(d.a[i]<<s)|(d.a[i-1]>>(64-s));
+    d.a[0]=d.a[0]<<s;
+  }
+  return d;
 }
 
-int getvmbits_shift(mbits *A, int j)
-{   uint64_t  temp=0;
+int getvmbits_shift(mbits *A, int j){   
+  uint64_t  temp=0;
     if (j>=1){
     temp=A->a[wsize-1] >> (maskbits-j);
     A->a[wsize-1]=((A->a[wsize-1]<<j)&mask)|(A->a[wsize-2]>>(64-j));
@@ -62,66 +61,64 @@ int getvmbits_shift(mbits *A, int j)
         A->a[i]=(A->a[i]<<j)|(A->a[i-1]>>(64-j));
     A->a[0]=A->a[0]<<j;
     }
- return temp; 
+  return temp; 
 }
 
-int getvmbits(mbits A, int j)
-{
- return A.a[wsize-1] >> (maskbits-j);
+int getvmbits(mbits A, int j){
+  return A.a[wsize-1] >> (maskbits-j);
 }
 
 mbits zero(mbits k1){
- for(int i=0;i<3;i++){
-     k1.a[i]=0;
-     k1.a[i]=0;     
- }
- return k1;
+  for(int i=0;i<3;i++){
+    k1.a[i]=0;
+    k1.a[i]=0;     
+  }
+  return k1;
 }
 
 points point_zero(points k1){
-    k1.x=zero(k1.x);
-    k1.y=zero(k1.y);     
- return k1;
+  k1.x=zero(k1.x);
+  k1.y=zero(k1.y);     
+  return k1;
 }
 
 void showword(mbits d){
-    int h;
-    string str1[]={"0","1","2","3","4","5","6","7","8","9","A","B","C","D","E","F"};                   
-    string str="";
-    for(int i=wsize-1;i>=0;i--){
-        for(int j=(63-3);j>=0;j=j-4)
-      str=str+str1[(d.a[i]>>j)&0x0f];  
-   }
-   printf("%s\n",str.c_str());  
-    //Serial.println(str.c_str());
+  int h;
+  String str1[]={"0","1","2","3","4","5","6","7","8","9","A","B","C","D","E","F"};                   
+  String str="";
+  for(int i=wsize-1;i>=0;i--){
+    for(int j=(63-3);j>=0;j=j-4)
+    str=str+str1[(d.a[i]>>j)&0x0f];  
+  }
+  printf("%s\n",str.c_str());  
+  //Serial.println(str.c_str());
 }
 
-mbits add(mbits a, mbits b)
-{
- mbits c;
- for(int i=0;i<wsize;i++)
+mbits add(mbits a, mbits b){
+  mbits c;
+  for(int i=0;i<wsize;i++)
     c.a[i]=a.a[i]^b.a[i];
- return c;   
+  return c;   
 }
 
 mbits f = {201,0,0};
 mbits GFM(mbits A, mbits B){
-   mbits C = {0,0,0};
-    for(int i=m-1; i>=1; i--){
-       if (getvmbits_shift(&A,1) == 1)
-          C=add(C,B);
-       if (getvmbits(C,1)==1)   
-          C=add(shift(C,1),f); 
-       else
-          C=shift(C,1);    
-    }
+  mbits C = {0,0,0};
+  for(int i=m-1; i>=1; i--){
     if (getvmbits_shift(&A,1) == 1)
-       C=add(C,B);
-    return C;
+      C=add(C,B);
+    if (getvmbits(C,1)==1)   
+      C=add(shift(C,1),f); 
+    else
+      C=shift(C,1);    
+  }
+  if (getvmbits_shift(&A,1) == 1)
+    C=add(C,B);
+  return C;
 }
 void cls(mbits *d){
     for(int i=0;i<wsize;i++)
-     	d->a[i]=0;
+      d->a[i]=0;
 }
 
 mbits powA_n(mbits k,points *a2T){
@@ -137,9 +134,9 @@ mbits powA_n(mbits k,points *a2T){
 			flag=flag+1;		
 		}	
 	}
-	
-	return sum	;
+	return sum;
 }
+
 void makepowt(int p, points *a){
 	uint64_t  vvvv=1;
 	for(int i=0;i<163;i++){
@@ -166,29 +163,27 @@ void makepowt(int p, points *a){
 			a[i].x.a[2]=a[i].x.a[2]^(vvvv<<(i-128));
 		}
   }
-	
 	for(int i=0;i<163;i++){
 		for(int j=0;j<p;j++){
 			a[i].x=GFM(a[i].x,a[i].x);
 		}
 	}
 }
+
 mbits sum, a2;
-mbits Inverse(mbits A)
-{ 
-    sum = {0x1,0,0};
-    a2 = GFM(A,A);
-    for(int i=0;i<m-1;i++){
-      sum=GFM(sum,a2);
-      a2=GFM(a2,a2);// X IS POWER 2
-    }
-    return sum;
+mbits Inverse(mbits A){ 
+  sum = {0x1,0,0};
+  a2 = GFM(A,A);
+  for(int i=0;i<m-1;i++){
+    sum=GFM(sum,a2);
+    a2=GFM(a2,a2);// X IS POWER 2
+  }
+  return sum;
 }
 
 
 
 mbits Inv(mbits c){   //改良 inverse
-	
 	mbits M3;   //cls(&M3);
 	mbits mt1;  //cls(&mt1);
 	mbits mt;   //cls(&mt);
@@ -215,8 +210,7 @@ mbits Inv(mbits c){   //改良 inverse
   sum=GFM(sum,sum); 
 	sum=GFM(mt,sum);
 
- 	return sum;
-	
+  return sum;
 }
 
 mbits one={1,0,0};
@@ -276,27 +270,27 @@ points point_add(points P, points Q){
     return g1;
 }
 points point_add2(points P, points Q){
-    points g1={0,0};
-    mbits s; mbits one={1,0,0}; mbits zero={0,0,0};
-    if ( equ(P.x,Q.x) && equ(add(P.x,P.y),Q.y) || equ(add(Q.x,Q.y),P.y)) // (x,y)+(x,x+y)=O
-         g1 = {0,0};
-    else 
-        if (equ(P.x,Q.x) && equ(P.y,Q.x))  // Q=P call point double function
-           g1=point_double2(P);
-        else
-        if (equ(P.x,zero) && equ(P.y,zero)) // O+Q = Q
-               g1=Q;
-           else
-            if (equ(Q.x,zero) && equ(Q.y,zero)) //P+O = P
-                g1=P;
-            else
-            {
-             s=GFM(add(Q.y,P.y),Inv(add(Q.x,P.x)));
-             g1.x=add(add(add(add(GFM(s,s),s),Q.x),P.x),one);
-             g1.y=add(add(GFM(s,add(P.x,g1.x)),g1.x),P.y);
-            }           
-    return g1;
+  points g1={0,0};
+  mbits s; mbits one={1,0,0}; mbits zero={0,0,0};
+  if ( equ(P.x,Q.x) && equ(add(P.x,P.y),Q.y) || equ(add(Q.x,Q.y),P.y)) // (x,y)+(x,x+y)=O
+    g1 = {0,0};
+  else 
+    if (equ(P.x,Q.x) && equ(P.y,Q.x))  // Q=P call point double function
+      g1=point_double2(P);
+    else
+      if (equ(P.x,zero) && equ(P.y,zero)) // O+Q = Q
+        g1=Q;
+      else
+        if (equ(Q.x,zero) && equ(Q.y,zero)) //P+O = P
+          g1=P;
+        else{
+          s=GFM(add(Q.y,P.y),Inv(add(Q.x,P.x)));
+          g1.x=add(add(add(add(GFM(s,s),s),Q.x),P.x),one);
+          g1.y=add(add(GFM(s,add(P.x,g1.x)),g1.x),P.y);
+        }           
+  return g1;
 }
+
 points  PT[2];
 points scalarmA(mbits K, points G1){
     PT[0] = {0,0};  PT[1] = G1; 
@@ -323,25 +317,25 @@ points scalarmA(mbits K, points G1){
 }
 
 points scalarmA2(mbits K, points G1){
-   PT[0] = {0,0};  PT[1] = G1; 
+  PT[0] = {0,0};  PT[1] = G1; 
 
-    points Q = {0,0};    // 162-128  127-64  63-0   a[2] a[1] a[0]
-   
-    for (int i=34; i>=0; i--){
-      Q = point_add2(Q, PT[(K.a[2] >> i) & 0x01]);
-      Q = point_double2(Q);
-    }
-   
-    for (int i=63; i>=0; i--){
-      Q = point_add2(Q, PT[(K.a[1] >> i) & 0x01]);
-      Q = point_double2(Q);
-    }
-   
-    for (int i=63; i>=1; i--){
-      Q = point_add2(Q, PT[(K.a[0] >> i) & 0x01]);
-      Q = point_double(Q);
-    }  
-    Q = point_add2(Q, PT[K.a[0]&0x01]);
-   
-    return Q;
+  points Q = {0,0};    // 162-128  127-64  63-0   a[2] a[1] a[0]
+  
+  for (int i=34; i>=0; i--){
+    Q = point_add2(Q, PT[(K.a[2] >> i) & 0x01]);
+    Q = point_double2(Q);
+  }
+  
+  for (int i=63; i>=0; i--){
+    Q = point_add2(Q, PT[(K.a[1] >> i) & 0x01]);
+    Q = point_double2(Q);
+  }
+  
+  for (int i=63; i>=1; i--){
+    Q = point_add2(Q, PT[(K.a[0] >> i) & 0x01]);
+    Q = point_double(Q);
+  }  
+  Q = point_add2(Q, PT[K.a[0]&0x01]);
+  
+  return Q;
 }
