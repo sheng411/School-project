@@ -3,19 +3,23 @@
 #include <iostream>
 #include <string>
 #include <cstdlib>
-#include "ecc.h"
+#include "ECC.h"
+#include "AES.h"
 #define LED_PIN LED_BUILTIN
-int ecc_key[16];
+uint64_t ecc_key[16];
+uint8_t s_msg[16];
+uint8_t r_msg[16];
+uint64_t s_box[256]={0}; uint64_t invs_box[256]={0};uint64_t nk=4;uint64_t nr=10; uint64_t rc[10]={0}; uint64_t w[ (10+1) * 4] ={0};
 using namespace std;
 
 //local
 const char* ssid = "kkESP32";
-const char* password = "1234567890";
+const char* password = "987654321";
 WiFiServer server(3559);
 
 //connect
 const char* c_SSID = "shESP32";
-const char* c_Password = "1234567890";
+const char* c_Password = "987654321";
 const int c_ServerPort = 3559;
 WiFiClient client;
 
@@ -45,6 +49,7 @@ void check_connect(){
         Serial.println("\nReconnect OK\n");
         show_wifi_info();
         ecc_connect();
+        AES_setting();
         ck=1;
     }
 }
@@ -61,6 +66,7 @@ void led_toggle() {
     digitalWrite(LED_PIN, !digitalRead(LED_PIN));
 }
 
+//ECC area
 String ecc_receive_msg(){
     //a to b
     Serial.println("Waiting for message from B...");
@@ -100,7 +106,7 @@ void ecc_send_msg(String message){
     }
 }
 
-void ecc_cut_key(String hex_string,int ecc_key[], mbits K){
+void ecc_cut_key(String hex_string,uint64_t ecc_key[], mbits K){
     String hex_string1;
     int count=0;
 
@@ -141,14 +147,15 @@ void ecc_cut_key(String hex_string,int ecc_key[], mbits K){
         count++;
         }
     }
-    /* test message(show ecc key)
+    /* test message(show ecc key)*/
     for(int i=0;i<16;i++){
-        Serial.print("ecc_key[");
+        /*Serial.print("ecc_key[");
         Serial.print(i);
-        Serial.print("] = ");
-        Serial.println(ecc_key[i],HEX);
+        Serial.print("] = ");*/
+        Serial.print(ecc_key[i],HEX);
+        Serial.print(",");
     }
-    */
+    
 }
 
 uint64_t getRandom64(){
@@ -208,12 +215,129 @@ void ecc_connect(){
     ecc_send_msg(str);
     String re_str2;     //接收到的D*G
     re_str2=ecc_receive_msg();
+
     //Serial.print("re_str2-->");
     //Serial.println(re_str2);
     ecc_cut_key(re_str2,ecc_key,K);
     Serial.println("ECC over-A");
 }
 
+//AES area
+void AES_setting(){
+    S_box_invS_box(s_box,invs_box);
+    rcv(nr, rc);
+    keyexpansion(ecc_key, w, nk, nr,rc,s_box);
+}
+
+void AES_s_cut_state(String text){
+    //text="abcd123456";
+    uint64_t utf8_bytes[16];
+    int utf8_len = text.length();
+    int index = 0;
+    
+    int current_byte_count = 0;  // 當前區塊中的總字節數
+
+    // 將最多 16 字節的資料存入 utf8_bytes，確保不超出邊界
+    while (index < utf8_len) {
+        // 判斷當前字元的 UTF-8 編碼長度
+        char current_char = text.charAt(index);
+        int bytes_copied;
+        if ((current_char & 0x80) == 0) {
+            bytes_copied = 1;
+        }
+        else if ((current_char & 0xE0) == 0xC0) {
+            bytes_copied = 2; 
+        }
+        else {
+            bytes_copied = 3; 
+        }
+
+        // 如果當前字元填入後會超過16字節，則結束當前區塊
+        if (current_byte_count + bytes_copied > 16) {
+            break; // 超過16字節，結束這個區塊
+        }
+
+        // 將 UTF-8 字符拆分成 bytes 並存入 utf8_bytes
+        if (bytes_copied == 1) {
+            utf8_bytes[current_byte_count] = current_char;
+        } else if (bytes_copied == 2) {
+            utf8_bytes[current_byte_count] = current_char;
+            index++; 
+            utf8_bytes[current_byte_count + 1] = text.charAt(index);
+        } else if (bytes_copied == 3) {
+            utf8_bytes[current_byte_count] = current_char; 
+            index++; 
+            utf8_bytes[current_byte_count + 1] = text.charAt(index); 
+            index++; 
+            utf8_bytes[current_byte_count + 2] = text.charAt(index); 
+        }
+        // 更新當前字節計數與索引
+        current_byte_count += bytes_copied;
+        index++;  
+    }
+    
+    // 顯示每個 8-bit 塊的 16 進制數值
+    Serial.println("UTF-8 encoded values (16 bytes):");
+    for (int i = 0; i < current_byte_count; i++) {
+    Serial.print("0x");
+    if (utf8_bytes[i] < 0x10) Serial.print("0");  // 補零確保兩位數
+    Serial.print(utf8_bytes[i], HEX);
+    Serial.print(" ");
+    }
+    Serial.println();
+
+/*
+    // 將有效字節轉回字串
+    String recoveredText = "";
+    for (int i = 0; i < current_byte_count; i++) {
+    recoveredText += (char)utf8_bytes[i];
+    }
+*/
+    cipher(utf8_bytes, nr,s_box,w);
+    Serial.print("[s_cut]Recovered text: ");
+    Serial.println(text);
+}
+
+void AES_r_cut_state(String message){
+    d0 = r_msg[0]  << 24 | r_msg[1]  << 16 | r_msg[2]  << 8 | r_msg[3];
+    d1 = r_msg[4]  << 24 | r_msg[5]  << 16 | r_msg[6]  << 8 | r_msg[7];
+    d2 = r_msg[8]  << 24 | r_msg[9]  << 16 | r_msg[10] << 8 | r_msg[11];
+    d3 = r_msg[12] << 24 | r_msg[13] << 16 | r_msg[14] << 8 | r_msg[15];
+    state[0] = d0;
+    state[1] = d1;
+    state[2] = d2;
+    state[3] = d3;
+    show(state);
+}
+
+string AES_Encryption(uint64_t state[]){
+    cipher(state, nr,s_box,w);
+    //show(state);
+    // 將有效字節轉回字串
+    string recoveredText = "";
+    for (int i = 0; i < current_byte_count; i++) {
+        recoveredText += (char)state[i];
+    }
+    Serial.print("[AES_Encry]Recovered text: ");
+    Serial.println(recoveredText);
+    return recoveredText;
+}
+
+void AES_Decryption(uint64_t state[]){
+    invcipher(state, nr,invs_box,w);
+    show(state);
+    
+    /*for (int i = 0; i < 16; i++) {
+        // 檢查是否是非零的字節
+        if (utf8_bytes[i] != 0) {
+            message += (char)utf8_bytes[i];  // 轉回字符
+        }
+    }*/
+    Serial.println("Reconstructed Text:");
+    //Serial.println(message);
+}
+
+//message receive and send
 void receive_msg(){
     //b to a
     WiFiClient client = server.available();
@@ -225,6 +349,7 @@ void receive_msg(){
                 Serial.print(WiFi.SSID());
                 Serial.print(" : ");
                 Serial.println(message);
+                AES_r_cut_state(message);
             }
         }
         client.stop();
@@ -240,7 +365,7 @@ void send_msg(){
         if (!message.isEmpty()) {
             Serial.println("Sending to B:" + message);
             if (client.connect(WiFi.gatewayIP(), c_ServerPort)) {
-                client.println(message);
+                client.println(AES_Encryption(AES_s_cut_state(message)));
             } else {
                 Serial.println("Connection to B failed");
             }
@@ -271,6 +396,8 @@ void setup() {
     show_wifi_info();
     server.begin();
     ecc_connect();
+    AES_setting();
+    Serial.println("setup OK");
 }
 
 void loop() {
