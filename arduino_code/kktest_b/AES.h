@@ -1,4 +1,3 @@
-#include <ArduinoJson.h>
 #include <iostream>
 #include <math.h>
 #include <string.h>
@@ -61,7 +60,7 @@ void show(uint64_t state[]){
 }
 
 void rcv(uint64_t nr,uint64_t rc[]){
-  int alpha = 1;
+  uint64_t alpha = 1;
   for(int i=0;i<nr;i++){
     rc[i] = alpha << 24;
     alpha= GFM(alpha, 2);
@@ -82,7 +81,7 @@ void keyexpansion(uint64_t key[],uint64_t w[],uint64_t nk,uint64_t nr, uint64_t 
   for (int i=0; i<nk; i++)
     w[i] = (key[0+4*i] << 24) | (key[1+4*i] << 16) | (key[2+4*i] << 8) | key[3+4*i];
   for (int i=nk; i<(4*(nr+1)); i++){
-    int temp = w[i-1];
+    uint64_t temp = w[i-1];
     if (i % nk == 0)
       temp = subword(rotword(temp), s_box) ^ rc[int(i/4)-1];
     else{   
@@ -249,7 +248,7 @@ void MixColumns_InvMix(uint64_t state[]){
   }
 }
 
-void cipher(uint64_t state[],uint64_t Nr,uint64_t s_box[256],uint64_t w[45]){
+void cipher(uint64_t state[],uint64_t Nr,uint64_t s_box[256],uint64_t w[]){
   AddRoundKey(state, 0,w);
   for (int i=1; i<Nr; i++){
     SubBytes(state,s_box);
