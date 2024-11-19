@@ -6,10 +6,16 @@
 #include "ECC.h"
 #include "AES.h"
 #define LED_PIN LED_BUILTIN
-uint64_t ecc_key[16];
 uint8_t s_msg[16];
 uint8_t r_msg[16];
-uint64_t s_box[256]={0}; uint64_t invs_box[256]={0};uint64_t nk=4;uint64_t nr=10; uint64_t rc[10]={0}; uint64_t w[ (10+1) * 4] ={0};
+// AES 參數設定
+uint64_t s_box[256] = {0};
+uint64_t invs_box[256] = {0};
+uint64_t nk = 4;
+uint64_t nr = 10;
+uint64_t rc[10] = {0};
+uint64_t w[(10 + 1) * 4] = {0};
+uint64_t ecc_key[16];
 int current_byte_count = 0;  // 當前區塊中的總字節數
 using namespace std;
 
@@ -230,205 +236,131 @@ void AES_setting(){
     keyexpansion(ecc_key, w, nk, nr,rc,s_box);
 }
 
-String AES_s_cut_state(String text){
-    //text="abcd123456";
-    uint8_t utf8_bytes[16];
-    int utf8_len = text.length();
-    int index = 0;
-    String re_text = "";
-    
-    // 將文字轉成 UTF-8 編碼並儲存到 utf8_bytes 中
-    while (index < utf8_len) {
-        memset(utf8_bytes, 0, sizeof(utf8_bytes));  // 清空陣列
-        current_byte_count = 0;  // 當前區塊中的總字節數
-
-        // 將最多 16 字節的資料存入 utf8_bytes，確保不超出邊界
-        while (index < utf8_len) {
-            // 判斷當前字元的 UTF-8 編碼長度
-            char current_char = text.charAt(index);
-            int bytes_copied;
-
-            if ((current_char & 0x80) == 0) {
-                bytes_copied = 1;
-            }
-            else if ((current_char & 0xE0) == 0xC0) {
-                bytes_copied = 2; 
-            }
-            else {
-                bytes_copied = 3; 
-            }
-
-            // 如果當前字元填入後會超過16字節，則結束當前區塊
-            if (current_byte_count + bytes_copied > 16) {
-                break; // 超過16字節，結束這個區塊
-            }
-
-            // 將 UTF-8 字符拆分成 bytes 並存入 utf8_bytes
-            if (bytes_copied == 1) {
-                utf8_bytes[current_byte_count] = current_char;
-            }
-            else if (bytes_copied == 2) {
-                utf8_bytes[current_byte_count] = current_char;
-                index++;
-                utf8_bytes[current_byte_count + 1] = text.charAt(index);
-            }
-            else if (bytes_copied == 3) {
-                utf8_bytes[current_byte_count] = current_char; 
-                index++; 
-                utf8_bytes[current_byte_count + 1] = text.charAt(index); 
-                index++; 
-                utf8_bytes[current_byte_count + 2] = text.charAt(index); 
-            }
-
-            // 更新當前字節計數與索引
-            current_byte_count += bytes_copied;
-            index++;  
-        }
-        state[0] = utf8_bytes[0]  << 24 | utf8_bytes[1]  << 16 | utf8_bytes[2]  << 8 | utf8_bytes[3];
-        state[1] = utf8_bytes[4]  << 24 | utf8_bytes[5]  << 16 | utf8_bytes[6]  << 8 | utf8_bytes[7];
-        state[2] = utf8_bytes[8]  << 24 | utf8_bytes[9]  << 16 | utf8_bytes[10] << 8 | utf8_bytes[11];
-        state[3] = utf8_bytes[12] << 24 | utf8_bytes[13] << 16 | utf8_bytes[14] << 8 | utf8_bytes[15];
-        cipher(state, nr,s_box,w);
-
-        // 顯示每個 8-bit 塊的 16 進制數值
-        Serial.println("UTF-8 encoded values (16 bytes):");
-        for (int i = 0; i < current_byte_count; i++) {
-            Serial.print("0x");
-            if (utf8_bytes[i] < 0x10) Serial.print("0");  // 補零確保兩位數
-            Serial.print(utf8_bytes[i], HEX);
-            Serial.print(" ");
-        }
-        Serial.println();
-
-         for(int i=0;i<4;i++){
-            int count=24;
-            for(int j=i*4;j<(i*4)+4;j++){
-                utf8_bytes[j]=(state[i] >> count) & 0xff;
-                count-=8;
-            }
-        }
-        // 將有效字節轉回字串
-        for (int i = 0; i < current_byte_count; i++) {
-            re_text += (char)utf8_bytes[i];
-        }
+String AES_Encryption(String str){
+    uint64_t len = str.length();
+    Serial.print("len: ");
+    Serial.println(len);
+    uint64_t num_blocks = (len + 15) / 16;
+    while (len % 16 != 0) {
+        str += ' '; // 用空格補齊
+        len++;
     }
-    Serial.print("[s_cut]Recovered text: ");
-    Serial.println(re_text);
-    return re_text;
+    
+    String encrypted_text = "";
+    // 每 16 字節一個區塊處理
+    uint64_t byte_array[16];
+    for (uint64_t block = 0; block < num_blocks; block++) {
+        String block_str = str.substring(block * 16, (block + 1) * 16);
+        const char *utf8Str = block_str.c_str();
+
+        for (int i = 0; i < 16; i++) {
+            byte_array[i] = (uint8_t)utf8Str[i];
+        }
+
+        // 將 byte array 轉換成 state
+        uint64_t state[4];
+        for (int i = 0; i < 4; i++) {
+            state[i] = byte_array[i * 4] << 24 | byte_array[i * 4 + 1] << 16 |
+            byte_array[i * 4 + 2] << 8 | byte_array[i * 4 + 3];
+        }
+    
+        // 顯示加密前 state
+        Serial.println("加密前 state:");
+        for (int i = 0; i < 4; i++) {
+            Serial.println(state[i], HEX);
+        }
+
+        // AES 加密
+        cipher(state, nr, s_box, w);
+
+        // 將 state 轉回 byte array
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                byte_array[i * 4 + j] = (state[i] >> (24 - j * 8)) & 0xFF;
+            }
+        }
+
+        // 顯示加密後 state
+        Serial.println("加密後 state:");
+        for (int i = 0; i < 4; i++) {
+            Serial.println(state[i], HEX);
+        }
+
+        // 加密結果轉換為字串
+        for (int i = 0; i < 16; i++) {
+            encrypted_text += (char)byte_array[i];
+        }
+        Serial.print("[]encrypted_text: ");
+        Serial.println(encrypted_text);
+    }
+    
+
+    Serial.print("加密後字串: ");
+    encrypted_text.trim(); // 去除補齊的空格
+    Serial.println(encrypted_text);
+    return encrypted_text;
 }
 
-String AES_r_cut_state(String text){
-    //text="abcd123456";
-    uint8_t utf8_bytes[16];
-    int utf8_len = text.length();
-    int index = 0;
-    String re_text = "";
-    
-    // 將文字轉成 UTF-8 編碼並儲存到 utf8_bytes 中
-    while (index < utf8_len) {
-        memset(utf8_bytes, 0, sizeof(utf8_bytes));  // 清空陣列
-        current_byte_count = 0;  // 當前區塊中的總字節數
-
-        // 將最多 16 字節的資料存入 utf8_bytes，確保不超出邊界
-        while (index < utf8_len) {
-            // 判斷當前字元的 UTF-8 編碼長度
-            char current_char = text.charAt(index);
-            int bytes_copied;
-
-            if ((current_char & 0x80) == 0) {
-                bytes_copied = 1;
-            }
-            else if ((current_char & 0xE0) == 0xC0) {
-                bytes_copied = 2; 
-            }
-            else {
-                bytes_copied = 3; 
-            }
-
-            // 如果當前字元填入後會超過16字節，則結束當前區塊
-            if (current_byte_count + bytes_copied > 16) {
-                break; // 超過16字節，結束這個區塊
-            }
-
-            // 將 UTF-8 字符拆分成 bytes 並存入 utf8_bytes
-            if (bytes_copied == 1) {
-                utf8_bytes[current_byte_count] = current_char;
-            }
-            else if (bytes_copied == 2) {
-                utf8_bytes[current_byte_count] = current_char;
-                index++;
-                utf8_bytes[current_byte_count + 1] = text.charAt(index);
-            }
-            else if (bytes_copied == 3) {
-                utf8_bytes[current_byte_count] = current_char; 
-                index++; 
-                utf8_bytes[current_byte_count + 1] = text.charAt(index); 
-                index++; 
-                utf8_bytes[current_byte_count + 2] = text.charAt(index); 
-            }
-
-            // 更新當前字節計數與索引
-            current_byte_count += bytes_copied;
-            index++;  
-        }
-        state[0] = utf8_bytes[0]  << 24 | utf8_bytes[1]  << 16 | utf8_bytes[2]  << 8 | utf8_bytes[3];
-        state[1] = utf8_bytes[4]  << 24 | utf8_bytes[5]  << 16 | utf8_bytes[6]  << 8 | utf8_bytes[7];
-        state[2] = utf8_bytes[8]  << 24 | utf8_bytes[9]  << 16 | utf8_bytes[10] << 8 | utf8_bytes[11];
-        state[3] = utf8_bytes[12] << 24 | utf8_bytes[13] << 16 | utf8_bytes[14] << 8 | utf8_bytes[15];
-        invcipher(state, nr,s_box,w);
-
-        // 顯示每個 8-bit 塊的 16 進制數值
-        Serial.println("\nUTF-8 encoded values (16 bytes):");
-        for (int i = 0; i < current_byte_count; i++) {
-            Serial.print("0x");
-            if (utf8_bytes[i] < 0x10) Serial.print("0");  // 補零確保兩位數
-            Serial.print(utf8_bytes[i], HEX);
-            Serial.print(" ");
-        }
-        Serial.println();
-
-        for(int i=0;i<4;i++){
-            int count=24;
-            for(int j=i*4;j<(i*4)+4;j++){
-                utf8_bytes[j]=(state[i] >> count) & 0xff;
-                count-=8;
-            }
-        }
-        // 將有效字節轉回字串
-        for (int i = 0; i < current_byte_count; i++) {
-            re_text += (char)utf8_bytes[i];
-        }
+String AES_Decryption(String str){
+    str.remove(str.length()-1);
+    Serial.print("收到的加密字串: ");
+    Serial.println(str);
+    uint64_t len = str.length();
+    Serial.print("len: ");
+    Serial.println(len);
+    uint64_t num_blocks = (len + 15) / 16;
+    while (len % 16 != 0) {
+        str += ' '; // 用空格補齊
+        len++;
     }
-    Serial.print("[r_cut]Recovered text: ");
-    Serial.println(re_text);
-    return re_text;
-}
-
-String AES_Encryption(uint64_t state[]){
-    cipher(state, nr,s_box,w);
-    //show(state);
-    // 將有效字節轉回字串
-    String recoveredText;
-    for (int i = 0; i < current_byte_count; i++) {
-        recoveredText += (char)state[i];
-    }
-    Serial.print("[AES_Encry]Recovered text: ");
-    Serial.println(recoveredText);
-    return recoveredText;
-}
-
-void AES_Decryption(uint64_t state[]){
-    invcipher(state, nr,invs_box,w);
-    show(state);
     
-    /*for (int i = 0; i < 16; i++) {
-        // 檢查是否是非零的字節
-        if (utf8_bytes[i] != 0) {
-            message += (char)utf8_bytes[i];  // 轉回字符
+    String decrypted_text = "";
+    // 每 16 字節一個區塊處理
+    uint64_t byte_array[16];
+    for (uint64_t block = 0; block < num_blocks; block++) {
+        String block_str = str.substring(block * 16, (block + 1) * 16);
+        const char *utf8Str = block_str.c_str();
+        Serial.print("block_str: ");
+        Serial.println(block_str);
+
+        for (int i = 0; i < 16; i++) {
+            byte_array[i] = (uint8_t)utf8Str[i];
         }
-    }*/
-    Serial.println("Reconstructed Text:");
-    //Serial.println(message);
+
+        // 將 byte array 轉換成 state
+        uint64_t state[4];
+        for (int i = 0; i < 4; i++) {
+            state[i] = byte_array[i * 4] << 24 | byte_array[i * 4 + 1] << 16 |
+            byte_array[i * 4 + 2] << 8 | byte_array[i * 4 + 3];
+        }
+    
+        // AES 解密
+        invcipher(state, nr, invs_box, w);
+/*
+        // 顯示解密後 state
+        Serial.println("解密後 state:");
+        for (int i = 0; i < 4; i++) {
+            Serial.println(state[i], HEX);
+        }
+*/
+        // 將解密結果轉換為字串
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                byte_array[i * 4 + j] = (state[i] >> (24 - j * 8)) & 0xFF;
+            }
+        }
+
+        for (int i = 0; i < 16; i++) {
+            decrypted_text += (char)byte_array[i];
+        }
+        Serial.print("[]dncrypted_text: ");
+        Serial.println(decrypted_text);
+    }
+
+    //Serial.print("解密後字串: ");
+    decrypted_text.trim(); // 去除補齊的空格
+    //Serial.println(decrypted_text);
+    return decrypted_text;
 }
 
 //message receive and send
@@ -443,7 +375,7 @@ void receive_msg(){
                 Serial.print("[receive]");
                 Serial.print(WiFi.SSID());
                 Serial.print(" : ");
-                Serial.println(AES_r_cut_state(message));
+                Serial.println(AES_Decryption(message));
             }
         }
         client.stop();
@@ -459,7 +391,7 @@ void send_msg(){
         if (!message.isEmpty()) {
             Serial.println("Sending to A:" + message);
             if (client.connect(WiFi.gatewayIP(), c_ServerPort)) {
-                client.println(AES_s_cut_state(message));
+                client.println(AES_Encryption(message));
             } else {
                 Serial.println("Connection to A failed");
             }
