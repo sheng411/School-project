@@ -5,7 +5,7 @@ from PyQt5.QtGui import QIcon
 import serial
 import serial.tools.list_ports
 
-# v 3.1
+# v 4.0
 
 '''     環境設定     '''
 title_name = "computer-A"   # 視窗標題
