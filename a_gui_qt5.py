@@ -30,7 +30,7 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # 初始化序列埠
         self.serial_port = None
-        
+
         # 建立中央 Widget
         central_widget = QtWidgets.QWidget()
         self.setCentralWidget(central_widget)
@@ -66,10 +66,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 font-family: "Microsoft YaHei", "微軟正黑體";
             }
         """)
-        
-        # 將標題和提示文字加入標題布局
-        title_layout.addWidget(title_label)
-        title_layout.addWidget(hint_label)
 
         # 建立序列埠控制區域
         port_control = QtWidgets.QHBoxLayout()
@@ -106,7 +102,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.connect_button.clicked.connect(self.toggle_connection)
         port_control.addWidget(self.connect_button)
 
-        # 將標題容器加入主布局
+        # 將標題和提示文字加入標題布局
+        title_layout.addWidget(title_label)
+        title_layout.addWidget(hint_label)
         main_layout.addWidget(title_container)
         main_layout.addLayout(port_control)
         main_layout.addStretch()  # 添加彈性空間，使標題置於上方
@@ -114,17 +112,22 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # 建立選單列
         menubar = self.menuBar()
-        input_menu = menubar.addMenu('輸入模式')
+        input_menu = menubar.addMenu('頁面選擇')
         
-        # 建立文字輸入動作
+        # 首頁
+        home_index_action = QtWidgets.QAction('回首頁', self)
+        home_index_action.triggered.connect(self.home_index_selected)
+
+        # 文字輸入
         text_input_action = QtWidgets.QAction('文字輸入', self)
         text_input_action.triggered.connect(self.text_input_selected)
         
-        # 建立檔案輸入動作
+        # 檔案輸入
         file_input_action = QtWidgets.QAction('檔案輸入', self)
         file_input_action.triggered.connect(self.file_input_selected)
         
         # 將動作加入選單
+        input_menu.addAction(home_index_action)
         input_menu.addAction(text_input_action)
         input_menu.addAction(file_input_action)
         
@@ -160,6 +163,80 @@ class MainWindow(QtWidgets.QMainWindow):
         section_layout.addWidget(label)
         section_layout.addWidget(text_edit)
         parent_layout.addLayout(section_layout)
+
+    # 首頁
+    def home_index_selected(self):
+        central_widget = QtWidgets.QWidget(self)
+        self.setCentralWidget(central_widget)
+
+        main_layout = QtWidgets.QVBoxLayout(central_widget)
+
+        # 標題
+        title_container = QtWidgets.QWidget()
+        title_layout = QtWidgets.QVBoxLayout(title_container)
+        
+        title_label = QtWidgets.QLabel("首頁")
+        title_label.setAlignment(QtCore.Qt.AlignCenter)
+        title_label.setStyleSheet("""
+            QLabel {
+                font-size: 36px;
+                font-weight: bold;
+                color: #333333;
+                margin-bottom: 10px;
+                font-family: "Microsoft YaHei", "微軟正黑體";
+            }
+        """)
+        
+        hint_label = QtWidgets.QLabel("請選擇模式")
+        hint_label.setAlignment(QtCore.Qt.AlignCenter)
+        hint_label.setStyleSheet("""
+            QLabel {
+                font-size: 24px;
+                color: #666666;
+                font-family: "Microsoft YaHei", "微軟正黑體";
+            }
+        """)
+        
+        # 建立序列埠控制區域
+        port_control = QtWidgets.QHBoxLayout()
+        
+        # 建立序列埠選擇下拉選單
+        self.port_combo = QtWidgets.QComboBox()
+        self.update_ports()
+        port_label = QtWidgets.QLabel("序列埠選擇:")
+        port_label.setStyleSheet("""
+            QLabel {
+                font-size: 20px;  /* 放大字體 */
+                font-weight: bold;  /* 粗體 */
+                color: #333333;
+                font-family: "Microsoft YaHei", "微軟正黑體";  /* 設置字體 */
+            }
+        """)
+        port_control.addWidget(port_label)
+        port_control.setAlignment(QtCore.Qt.AlignCenter)
+        port_control.addWidget(self.port_combo)
+        
+        # 建立連接按鈕
+        self.connect_button = QtWidgets.QPushButton("連接")
+        self.connect_button.setFixedSize(100, 40)
+        self.connect_button.setStyleSheet("""
+            QPushButton {
+                border-radius: 20px;
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                font-family: "Microsoft YaHei", "微軟正黑體";
+                font-size: 16px
+            }
+        """)
+        self.connect_button.clicked.connect(self.toggle_connection)
+        port_control.addWidget(self.connect_button)
+
+        title_layout.addWidget(title_label)
+        title_layout.addWidget(hint_label)
+        main_layout.addWidget(title_container)
+        main_layout.addLayout(port_control)
+        main_layout.addStretch()
 
     # 文字選單區
     def text_input_selected(self):
@@ -337,8 +414,8 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             self.image_preview.setPixmap(scaled_pixmap)
     
+    # 更新可用序列埠列表
     def update_ports(self):
-        """更新可用序列埠列表"""
         self.port_combo.clear()
         ports = [port.device for port in serial.tools.list_ports.comports()]
         
@@ -378,9 +455,9 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             self.port_combo.addItems(ports)
             print("可用序列埠列表:", ports)
-        
+
+    # 切換序列埠連接狀態
     def toggle_connection(self):
-        """切換序列埠連接狀態"""
         if self.serial_port is None:  # 未連接狀態
             try:
                 selected_port = self.port_combo.currentText()
@@ -419,7 +496,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 """)
             self.port_combo.setEnabled(True)
             print("已斷開序列埠連接")
-
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
