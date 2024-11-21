@@ -5,13 +5,14 @@ from PyQt5.QtGui import QIcon
 import serial
 import serial.tools.list_ports
 
-# v 3.0
+# v 3.1
 
 '''     環境設定     '''
 title_name = "computer-A"   # 視窗標題
 window_size = (850, 650)    # width, height
 icon_path = os.path.join(os.path.dirname(__file__), "icon.png")     #先抓當前檔案的路徑,再加上icon
 serial_baud=115200
+serial_port=None
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -99,9 +100,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 color: white;
                 border: none;
                 font-family: "Microsoft YaHei", "微軟正黑體";
-                font-size: 14px
+                font-size: 16px
             }
         """)
+        self.connect_button.clicked.connect(self.toggle_connection)
         port_control.addWidget(self.connect_button)
 
         # 將標題容器加入主布局
@@ -384,8 +386,20 @@ class MainWindow(QtWidgets.QMainWindow):
                 selected_port = self.port_combo.currentText()
                 self.serial_port = serial.Serial(selected_port, serial_baud, timeout=1)
                 self.connect_button.setText("斷開")
-                print("我選的酷東西", self.port_combo.currentText())
+                serial_port=self.port_combo.currentText()
+                self.connect_button.setStyleSheet("""
+                    QPushButton {
+                        border-radius: 20px;
+                        background-color: #ff0000;
+                        color: white;
+                        border: none;
+                        font-family: "Microsoft YaHei", "微軟正黑體";
+                        font-size: 16px
+                    }
+                """)
                 self.port_combo.setEnabled(False)
+                print("我連上的酷東西", serial_port)
+
             except Exception as e:
                 QtWidgets.QMessageBox.critical(self, "錯誤", f"無法連接到序列埠: {str(e)}")
                 self.serial_port = None
@@ -393,8 +407,18 @@ class MainWindow(QtWidgets.QMainWindow):
             self.serial_port.close()
             self.serial_port = None
             self.connect_button.setText("連接")
-            
+            self.connect_button.setStyleSheet("""
+                    QPushButton {
+                        border-radius: 20px;
+                        background-color: #4CAF50;
+                        color: white;
+                        border: none;
+                        font-family: "Microsoft YaHei", "微軟正黑體";
+                        font-size: 16px
+                    }
+                """)
             self.port_combo.setEnabled(True)
+            print("已斷開序列埠連接")
 
 
 if __name__ == "__main__":
