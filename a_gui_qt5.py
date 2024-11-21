@@ -1,10 +1,17 @@
-from PyQt5 import QtWidgets, QtCore, QtGui
 import sys
+import os
+from PyQt5 import QtWidgets, QtCore, QtGui
+from PyQt5.QtGui import QIcon
+import serial
+import serial.tools.list_ports
 
-# v 2.0
+# v 3.0
 
+'''     環境設定     '''
 title_name = "computer-A"   # 視窗標題
 window_size = (850, 650)    # width, height
+icon_path = os.path.join(os.path.dirname(__file__), "icon.png")     #先抓當前檔案的路徑,再加上icon
+serial_baud=115200
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -13,6 +20,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setObjectName("MainWindow")
         self.setWindowTitle(title_name)
         self.resize(window_size[0], window_size[1])
+
+        # icon圖像設定
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        else:
+            print("Icon file not found!")
+        
+        # 初始化序列埠
+        self.serial_port = None
         
         # 建立中央 Widget
         central_widget = QtWidgets.QWidget()
@@ -20,6 +36,7 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # 建立主布局
         main_layout = QtWidgets.QVBoxLayout(central_widget)
+        
         
         # 建立標題區域
         title_container = QtWidgets.QWidget()
@@ -52,11 +69,47 @@ class MainWindow(QtWidgets.QMainWindow):
         # 將標題和提示文字加入標題布局
         title_layout.addWidget(title_label)
         title_layout.addWidget(hint_label)
+
+        # 建立序列埠控制區域
+        port_control = QtWidgets.QHBoxLayout()
         
+        # 建立序列埠選擇下拉選單
+        self.port_combo = QtWidgets.QComboBox()
+        self.update_ports()
+        port_label = QtWidgets.QLabel("序列埠選擇:")
+        port_label.setStyleSheet("""
+            QLabel {
+                font-size: 20px;  /* 放大字體 */
+                font-weight: bold;  /* 粗體 */
+                color: #333333;
+                font-family: "Microsoft YaHei", "微軟正黑體";  /* 設置字體 */
+            }
+        """)
+        port_control.addWidget(port_label)
+        port_control.setAlignment(QtCore.Qt.AlignCenter)
+        port_control.addWidget(self.port_combo)
+        
+        # 建立連接按鈕
+        self.connect_button = QtWidgets.QPushButton("連接")
+        self.connect_button.setFixedSize(100, 40)
+        self.connect_button.setStyleSheet("""
+            QPushButton {
+                border-radius: 20px;
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                font-family: "Microsoft YaHei", "微軟正黑體";
+                font-size: 14px
+            }
+        """)
+        port_control.addWidget(self.connect_button)
+
         # 將標題容器加入主布局
         main_layout.addWidget(title_container)
+        main_layout.addLayout(port_control)
         main_layout.addStretch()  # 添加彈性空間，使標題置於上方
-        
+
+
         # 建立選單列
         menubar = self.menuBar()
         input_menu = menubar.addMenu('輸入模式')
@@ -198,7 +251,7 @@ class MainWindow(QtWidgets.QMainWindow):
         print("選擇檔案輸入模式")
         # 清除現有的中央元件
         old_widget = self.centralWidget()
-        if old_widget:
+        if (old_widget):
             old_widget.deleteLater()
         
         # 建立新的中央元件
@@ -281,6 +334,67 @@ class MainWindow(QtWidgets.QMainWindow):
                 QtCore.Qt.SmoothTransformation
             )
             self.image_preview.setPixmap(scaled_pixmap)
+    
+    def update_ports(self):
+        """更新可用序列埠列表"""
+        self.port_combo.clear()
+        ports = [port.device for port in serial.tools.list_ports.comports()]
+        
+        # 設置下拉選單樣式
+        self.port_combo.setStyleSheet("""
+            QComboBox {
+                border: 2px solid #ccc;
+                border-radius: 10px;
+                padding: 5px;
+                min-width: 150px;
+                height: 30px;
+                font-size: 16px;
+                font-family: "Microsoft YaHei", "微軟正黑體";
+                background-color: white;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 30px;
+            }
+            QComboBox::down-arrow {
+                image: url(down_arrow.png);
+                width: 12px;
+                height: 12px;
+            }
+            QComboBox QAbstractItemView {
+                border: 2px solid #ccc;
+                border-radius: 5px;
+                selection-background-color: #4CAF50;
+                selection-color: white;
+            }
+        """)
+        
+        # 如果沒有可用序列埠，添加提示文字
+        if not ports:
+            self.port_combo.addItem("未找到可用序列埠")
+            print("未找到可用序列埠")
+        else:
+            self.port_combo.addItems(ports)
+            print("可用序列埠列表:", ports)
+        
+    def toggle_connection(self):
+        """切換序列埠連接狀態"""
+        if self.serial_port is None:  # 未連接狀態
+            try:
+                selected_port = self.port_combo.currentText()
+                self.serial_port = serial.Serial(selected_port, serial_baud, timeout=1)
+                self.connect_button.setText("斷開")
+                print("我選的酷東西", self.port_combo.currentText())
+                self.port_combo.setEnabled(False)
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(self, "錯誤", f"無法連接到序列埠: {str(e)}")
+                self.serial_port = None
+        else:  # 已連接狀態
+            self.serial_port.close()
+            self.serial_port = None
+            self.connect_button.setText("連接")
+            
+            self.port_combo.setEnabled(True)
 
 
 if __name__ == "__main__":
