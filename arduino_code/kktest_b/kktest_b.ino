@@ -45,8 +45,9 @@ void check_connect(){
         ck=0;
         led_toggle();
         Serial.println("Wifi disconnected,reconnect...");
+        WiFi.disconnect();
         WiFi.begin(c_SSID, c_Password);
-        delay(100);
+        delay(500);
     }
     else{
         led_on();
@@ -365,6 +366,7 @@ String AES_Decryption(String str){
 
 //message receive and send
 void receive_msg(){
+    static uint8_t buffer_spase[16];
     //a to b
     WiFiClient client = server.available();
     if (client) {
@@ -375,24 +377,57 @@ void receive_msg(){
                 Serial.print("[receive]");
                 Serial.print(WiFi.SSID());
                 Serial.print(" : ");
-                Serial.println(AES_Decryption(message));
+
+                // 解密後清理原始訊息
+                String decrypted = AES_Decryption(message);
+                message.clear();
+                Serial.println(decrypted);
+                
+                // 清理解密後的訊息和緩衝區
+                decrypted.clear();
+                memset(buffer_spase, 0, sizeof(buffer_spase));
+                memset(r_msg, 0, sizeof(r_msg));
+
+                // clear the message buffer
+                message = "";
+                client.flush();
             }
         }
         client.stop();
+        // 強制清理WiFi Client資源
+        client.flush();
+        client = WiFiClient();
         //Serial.println("Client disconnected");
     }
 }
 
 void send_msg(){
     //b to a
+    static uint8_t buffer_spase[16];
+    
     if (Serial.available() > 0) {
         String message = Serial.readStringUntil('\n');
         message.trim();
         if (!message.isEmpty()) {
             Serial.println("Sending to A:" + message);
             if (client.connect(WiFi.gatewayIP(), c_ServerPort)) {
-                client.println(AES_Encryption(message));
-            } else {
+                String encrypted = AES_Encryption(message);
+                message.clear();
+                
+                client.println(encrypted);
+                // 清理加密後的訊息
+                encrypted.clear();
+                
+                // 清理緩衝區
+                memset(buffer_spase, 0, sizeof(buffer_spase));
+                memset(s_msg, 0, sizeof(s_msg));
+
+                // clear the message buffer
+                client.flush();
+                client.stop();
+                client = WiFiClient();
+            }
+            else {
                 Serial.println("Connection to A failed");
             }
         }
@@ -410,6 +445,7 @@ void setup() {
     makepowt(40,anT40)  ;
     WiFi.softAP(ssid, password);
     WiFi.begin(c_SSID, c_Password);
+    WiFi.mode(WIFI_AP_STA);
 
     pinMode(LED_PIN, OUTPUT);
     led_off();
