@@ -2,19 +2,50 @@ import sys
 import os
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import (QLabel, QPushButton,QLineEdit)
-from PyQt5.QtCore import QDateTime, Qt
+from PyQt5.QtCore import QThread, Qt, pyqtSignal
 import serial
 import serial.tools.list_ports
 
-# v 5.0
+# v 6.0
 
 '''     環境設定     '''
 title_name = "computer-A"   # 視窗標題
 window_size = (900, 700)    # width, height
 icon_path = os.path.join(os.path.dirname(__file__), "icon.png")     #先抓當前檔案的路徑,再加上icon
 serial_baud=115200
-#ser = serial.Serial(serial_port, serial_baud)
+
+class SerialReaderThread(QThread):
+    data_received = pyqtSignal(str)  # 發送訊息到主介面
+
+    def __init__(self, serial_port):
+        super().__init__()
+        #self.port = port
+        self.running = True
+        self.serial_connection = serial_port
+
+    def run(self):
+        try:
+            # 打開串列埠
+            #self.serial_connection = serial.Serial(self.port, serial_baud)
+            print(self.serial_connection)
+            while self.running:
+                if self.serial_connection.in_waiting > 0:  # 確認有資料可讀
+                    try:
+                        data = self.serial_connection.readline().decode('utf-8', errors='ignore').strip()
+                        if data:  # 避免空行干擾
+                            self.data_received.emit(data)
+                    except Exception as e:
+                        self.data_received.emit(f"Error reading data: {str(e)}")
+        except Exception as e:
+            self.data_received.emit(f"Error: {str(e)}")
+        finally:
+            if self.serial_connection:
+                self.serial_connection.close()
+
+    def stop(self):
+        self.running = False
+        if self.serial_connection and self.serial_connection.is_open:
+            self.serial_connection.close()
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -39,12 +70,11 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # 建立主布局
         main_layout = QtWidgets.QVBoxLayout(central_widget)
-        
-        
+
         # 建立標題區域
         title_container = QtWidgets.QWidget()
         title_layout = QtWidgets.QVBoxLayout(title_container)
-        
+
         # 首頁標題
         title_label = QtWidgets.QLabel("首頁")
         title_label.setAlignment(QtCore.Qt.AlignCenter)
@@ -57,7 +87,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 font-family: "Microsoft YaHei", "微軟正黑體";
             }
         """)
-        
+
         # 提示文字
         hint_label = QtWidgets.QLabel("請選擇模式")
         hint_label.setAlignment(QtCore.Qt.AlignCenter)
@@ -100,6 +130,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 font-family: "Microsoft YaHei", "微軟正黑體";
                 font-size: 16px
             }
+            QPushButton:hover {
+                background-color: #008000;
+            }
         """)
         self.connect_button.clicked.connect(self.toggle_connection)
         port_control.addWidget(self.connect_button)
@@ -116,8 +149,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 font-family: "Microsoft YaHei", "微軟正黑體";
                 font-size: 16px
             }
+            QPushButton:hover {
+                background-color: #808080;
+            }
         """)
         self.refresh_button.clicked.connect(self.refresh_ports)
+        print("已刷新")
         port_control.addWidget(self.refresh_button)
 
 
@@ -163,9 +200,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 font-family: "Microsoft YaHei", "微軟正黑體";
                 font-size: 16px
             }
+            QPushButton:hover {
+                background-color: #1e90ff;
+            }
         """)
-        self.login_button.setEnabled(False)  # 預設按鈕為禁用
+        #self.login_button.setEnabled(False)  # 預設按鈕為禁用
         self.login_button.clicked.connect(self.text_input_selected)
+        self.login_button.clicked.connect(self.start_listening)
         
         login_layout.addWidget(name_label)
         login_layout.addWidget(self.name_input)
@@ -201,18 +242,10 @@ class MainWindow(QtWidgets.QMainWindow):
         input_menu.addAction(home_index_action)
         input_menu.addAction(text_input_action)
         input_menu.addAction(file_input_action)
-        '''
-        # 啟動接收訊息的計時器
-        print("1")
-        if check_serial==True:
-            global ser
-            print("check_serial",check_serial)
-            #self.update_received_message()
-            ser = serial.Serial(serial_port, serial_baud)
-            print(ser)
-        '''
+        
+        self.serial_thread = None
 
-    # 版面配置
+# 版面配置
     def create_section(self, parent_layout, label_text, placeholder):
         section_layout = QtWidgets.QVBoxLayout()
         # 標籤設置
@@ -244,7 +277,7 @@ class MainWindow(QtWidgets.QMainWindow):
         section_layout.addWidget(text_edit)
         parent_layout.addLayout(section_layout)
 
-    # 首頁
+# 首頁
     def home_index_selected(self):
         central_widget = QtWidgets.QWidget(self)
         self.setCentralWidget(central_widget)
@@ -297,16 +330,19 @@ class MainWindow(QtWidgets.QMainWindow):
         port_control.addWidget(self.port_combo)
         
         # 建立連接按鈕
-        self.connect_button = QtWidgets.QPushButton("連接")
+        self.connect_button = QtWidgets.QPushButton("斷開")
         self.connect_button.setFixedSize(100, 40)
         self.connect_button.setStyleSheet("""
             QPushButton {
                 border-radius: 20px;
-                background-color: #4CAF50;
+                background-color: #ff0000;
                 color: white;
                 border: none;
                 font-family: "Microsoft YaHei", "微軟正黑體";
                 font-size: 16px
+            }
+            QPushButton:hover {
+                background-color: #dc143c;
             }
         """)
         self.connect_button.clicked.connect(self.toggle_connection)
@@ -324,8 +360,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 font-family: "Microsoft YaHei", "微軟正黑體";
                 font-size: 16px
             }
+            QPushButton:hover {
+                background-color: #808080;
+            }
         """)
         self.refresh_button.clicked.connect(self.refresh_ports)
+        print("已刷新")
         port_control.addWidget(self.refresh_button)
 
     # 建立名字輸入區
@@ -370,8 +410,11 @@ class MainWindow(QtWidgets.QMainWindow):
                 font-family: "Microsoft YaHei", "微軟正黑體";
                 font-size: 16px
             }
+            QPushButton:hover {
+                background-color: #1e90ff;
+            }
         """)
-        self.login_button.setEnabled(False)  # 預設按鈕為禁用
+        #self.login_button.setEnabled(False)  # 預設按鈕為禁用
         self.login_button.clicked.connect(self.text_input_selected)
         
         login_layout.addWidget(name_label)
@@ -425,12 +468,33 @@ class MainWindow(QtWidgets.QMainWindow):
                 font-family: "Microsoft YaHei", "微軟正黑體";  /* 新增字體設定 */
             }
             QPushButton:hover {
-                background-color: #45a049;
+                background-color: #008000;
             }
         """)
         send_button.clicked.connect(self.send_message)
         
         right_layout.addWidget(send_button, 0, QtCore.Qt.AlignTop)  # 使用 AlignTop 確保按鈕在頂部
+        main_layout.addWidget(right_container)
+
+        # 清除訊息
+        clear_button = QtWidgets.QPushButton("清除")
+        clear_button.setFixedSize(150, 60)
+        clear_button.setStyleSheet("""
+            QPushButton {
+                border-radius: 30px;
+                background-color: #c0c0c0;
+                color: white;
+                border: none;
+                font-size: 16px;
+                font-family: "Microsoft YaHei", "微軟正黑體";  /* 新增字體設定 */
+            }
+            QPushButton:hover {
+                background-color: #808080;
+            }
+        """)
+        clear_button.clicked.connect(self.clear_message)
+        
+        right_layout.addWidget(clear_button, 1, QtCore.Qt.AlignTop)  # 使用 AlignTop 確保按鈕在頂部
         main_layout.addWidget(right_container)
 
     # 建立區塊並返回文字編輯框的引用
@@ -466,7 +530,6 @@ class MainWindow(QtWidgets.QMainWindow):
         return text_edit
 
 # 送訊息
-    
     def send_message(self):
         message = self.send_area.toPlainText()
         if message:
@@ -478,71 +541,27 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.send_area.clear()
             except Exception as e:
                 print(f"Error sending message: {e}")
-    '''
 
-    def send_message(self):
-        """發送訊息"""
-        print(self.ser)
-        if not self.ser or not self.is_connected:
-            QtWidgets.QMessageBox.warning(
-                self,
-                "連接錯誤",
-                "請先連接序列埠"
-            )
-            return
-            
-        message = self.send_area.toPlainText()
-        if not message:
-            return
-            
-        try:
-            message += "\n"
-            self.ser.write(message.encode('UTF-8'))
-            print(f"送出訊息-> {message}")
-            self.send_area.clear()
-        except Exception as e:
-            print(f"發送錯誤: {e}")
-            self.is_connected = False
-            QtWidgets.QMessageBox.warning(
-                self,
-                "發送錯誤",
-                f"無法發送訊息: {e}"
-            )
-    '''
+# 清除訊息
+    def clear_message(self):
+        self.receive_area.clear()
+
 # 接收訊息
-    def serial_listen_data(self):
-        try:
-            if not self.is_connected or not self.serial_port.is_open:
-                return None
-                
-            if self.serial_port.in_waiting:
-                data = self.serial_port.readline().decode('UTF-8', errors='ignore').rstrip()
-                print(f"Received raw data: {data}")  # 加入更多除錯訊息
-                return data
-            return None
-        except serial.SerialException as e:
-            print(f"Serial port error: {e}")
-            self.is_connected = False  # 發生錯誤時更新狀態
-            return None
-    
-    def update_received_message(self):
-        if not self.is_connected:
-            return
-            
-        try:
-            received_data = self.serial_listen_data()
-            if received_data:
-                self.receive_area.append(received_data + '\n')  # 改用append而不是setText
-                print(f"接收訊息-> {received_data}")
-            
-            # 確保Timer只在連接狀態下繼續
-            if self.is_connected:
-                QtCore.QTimer.singleShot(500, self.update_received_message)
-                
-        except Exception as e:
-            print(f"Error receiving message: {e}")
+    def start_listening(self):
+        #self.serial_port = self.port_selector.currentText()
+        if hasattr(self, 'serial_port') and self.serial_port.is_open:
+            self.serial_thread = SerialReaderThread(self.serial_port)
+            self.serial_thread.data_received.connect(self.display_data)
+            self.serial_thread.start()
+        else:
+            print("Serial port not connected")
 
-    # 檔案選單區
+# 顯示資料
+    def display_data(self, data):
+            self.receive_area.append(data)
+            print(f"接收訊息-> {data}")
+
+# 檔案選單區
     def file_input_selected(self):
         print("選擇檔案輸入模式")
         # 清除現有的中央元件
@@ -609,7 +628,7 @@ class MainWindow(QtWidgets.QMainWindow):
         main_layout.addWidget(self.image_preview)
         main_layout.addStretch()
 
-    # 瀏覽圖片
+# 瀏覽圖片
     def browse_image(self):
         # 設定支援的圖片格式
         image_formats = "圖片檔案 (*.png *.jpg *.jpeg *.bmp *.gif)"
@@ -630,8 +649,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 QtCore.Qt.SmoothTransformation
             )
             self.image_preview.setPixmap(scaled_pixmap)
-    
-    # 更新可用序列埠列表
+
+# 更新可用序列埠列表
     def update_ports(self):
         self.port_combo.clear()
         ports = [port.device for port in serial.tools.list_ports.comports()]
@@ -672,22 +691,22 @@ class MainWindow(QtWidgets.QMainWindow):
             self.port_combo.addItems(ports)
             print("可用序列埠列表:", ports)
 
+#刷新串列埠清單
     def refresh_ports(self):
-            """刷新串列埠清單"""
+            
             self.port_combo.clear()
             ports = serial.tools.list_ports.comports()
             for port in ports:
                 self.port_combo.addItem(port.device)
 
-    # 切換序列埠連接狀態
+# 切換序列埠連接狀態
     def toggle_connection(self):
-        global ser
         if self.serial_port is None:  # 未連接狀態
             try:
                 selected_port = self.port_combo.currentText()
                 self.serial_port = serial.Serial(selected_port,serial_baud)
-                self.connect_button.setText("斷開")
                 #self.serial_port=selected_port
+                self.connect_button.setText("斷開")
                 self.connect_button.setStyleSheet("""
                     QPushButton {
                         border-radius: 20px;
@@ -696,6 +715,9 @@ class MainWindow(QtWidgets.QMainWindow):
                         border: none;
                         font-family: "Microsoft YaHei", "微軟正黑體";
                         font-size: 16px
+                    }
+                    QPushButton:hover {
+                        background-color: #dc143c;
                     }
                 """)
                 self.port_combo.setEnabled(False)
