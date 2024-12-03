@@ -6,12 +6,14 @@ from PyQt5.QtCore import QThread, Qt, pyqtSignal
 import serial
 import serial.tools.list_ports
 
-# v 6.0
+# v 6.1
 
 '''     環境設定     '''
 title_name = "computer-A"   # 視窗標題
 window_size = (900, 700)    # width, height
 icon_path = os.path.join(os.path.dirname(__file__), "icon.png")     #先抓當前檔案的路徑,再加上icon
+background_path=os.path.join(os.path.dirname(__file__), "background.jpg")  #背景圖片
+background_path_fixed = background_path.replace("\\", "/")  #斜線翻轉
 serial_baud=115200
 
 class SerialReaderThread(QThread):
@@ -50,10 +52,20 @@ class SerialReaderThread(QThread):
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        
+
+        self.connect_check=False
         self.setObjectName("MainWindow")
         self.setWindowTitle(title_name)
         self.resize(window_size[0], window_size[1])
+
+        # 設定背景圖片
+        self.setStyleSheet(f"""
+            QMainWindow {{
+                background-image: url({background_path_fixed});
+                background-position: center;
+                background-repeat: none;
+            }}
+        """)
 
         # icon圖像設定
         if os.path.exists(icon_path):
@@ -76,7 +88,7 @@ class MainWindow(QtWidgets.QMainWindow):
         title_layout = QtWidgets.QVBoxLayout(title_container)
 
         # 首頁標題
-        title_label = QtWidgets.QLabel("首頁")
+        title_label = QtWidgets.QLabel("呱呱呱呱呱")
         title_label.setAlignment(QtCore.Qt.AlignCenter)
         title_label.setStyleSheet("""
             QLabel {
@@ -281,14 +293,26 @@ class MainWindow(QtWidgets.QMainWindow):
     def home_index_selected(self):
         central_widget = QtWidgets.QWidget(self)
         self.setCentralWidget(central_widget)
+        self.setStyleSheet("")
 
         main_layout = QtWidgets.QVBoxLayout(central_widget)
+
+        # 設定背景圖片
+        self.setStyleSheet(f"""
+            QMainWindow {{
+                background-image: url({background_path_fixed});
+                background-position: center;
+                background-repeat: no-repeat;
+                background-attachment: fixed;
+                background-size: cover;
+            }}
+        """)
 
         # 標題
         title_container = QtWidgets.QWidget()
         title_layout = QtWidgets.QVBoxLayout(title_container)
         
-        title_label = QtWidgets.QLabel("首頁")
+        title_label = QtWidgets.QLabel("呱呱呱呱呱")
         title_label.setAlignment(QtCore.Qt.AlignCenter)
         title_label.setStyleSheet("""
             QLabel {
@@ -330,21 +354,38 @@ class MainWindow(QtWidgets.QMainWindow):
         port_control.addWidget(self.port_combo)
         
         # 建立連接按鈕
-        self.connect_button = QtWidgets.QPushButton("斷開")
-        self.connect_button.setFixedSize(100, 40)
-        self.connect_button.setStyleSheet("""
-            QPushButton {
-                border-radius: 20px;
-                background-color: #ff0000;
-                color: white;
-                border: none;
-                font-family: "Microsoft YaHei", "微軟正黑體";
-                font-size: 16px
-            }
-            QPushButton:hover {
-                background-color: #dc143c;
-            }
-        """)
+        if self.connect_check:
+            self.connect_button = QtWidgets.QPushButton("斷開")
+            self.connect_button.setFixedSize(100, 40)
+            self.connect_button.setStyleSheet("""
+                QPushButton {
+                    border-radius: 20px;
+                    background-color: #ff0000;
+                    color: white;
+                    border: none;
+                    font-family: "Microsoft YaHei", "微軟正黑體";
+                    font-size: 16px
+                }
+                QPushButton:hover {
+                    background-color: #dc143c;
+                }
+            """)
+        else:
+            self.connect_button = QtWidgets.QPushButton("連接")
+            self.connect_button.setFixedSize(100, 40)
+            self.connect_button.setStyleSheet("""
+                QPushButton {
+                    border-radius: 20px;
+                    background-color: #4CAF50;
+                    color: white;
+                    border: none;
+                    font-family: "Microsoft YaHei", "微軟正黑體";
+                    font-size: 16px
+                }
+                QPushButton:hover {
+                    background-color: #008000;
+                }
+            """)
         self.connect_button.clicked.connect(self.toggle_connection)
         port_control.addWidget(self.connect_button)
 
@@ -431,6 +472,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # 文字選單區
     def text_input_selected(self):
+        self.setStyleSheet("")
         central_widget = QtWidgets.QWidget(self)
         self.setCentralWidget(central_widget)
 
@@ -563,6 +605,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 # 檔案選單區
     def file_input_selected(self):
+        self.setStyleSheet("")
         print("選擇檔案輸入模式")
         # 清除現有的中央元件
         old_widget = self.centralWidget()
@@ -722,6 +765,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 """)
                 self.port_combo.setEnabled(False)
                 print("我連上的酷東西", selected_port)
+                self.connect_check=True
                 print(self.serial_port,serial_baud)
                 #ser = serial.Serial(serial_port, serial_baud)
 
@@ -743,6 +787,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     }
                 """)
             self.port_combo.setEnabled(True)
+            self.connect_check=False
             print("已斷開序列埠連接")
 
 if __name__ == "__main__":
