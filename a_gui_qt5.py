@@ -6,7 +6,7 @@ from PyQt5.QtCore import QThread, Qt, pyqtSignal
 import serial
 import serial.tools.list_ports
 
-# v 6.1
+# v 6.2
 
 '''     環境設定     '''
 title_name = "computer-A"   # 視窗標題
@@ -15,6 +15,7 @@ icon_path = os.path.join(os.path.dirname(__file__), "icon.png")     #先抓當�
 background_path=os.path.join(os.path.dirname(__file__), "background.jpg")  #背景圖片
 background_path_fixed = background_path.replace("\\", "/")  #斜線翻轉
 serial_baud=115200
+index_name="呱呱呱呱呱" #首頁標題
 
 class SerialReaderThread(QThread):
     data_received = pyqtSignal(str)  # 發送訊息到主介面
@@ -88,7 +89,7 @@ class MainWindow(QtWidgets.QMainWindow):
         title_layout = QtWidgets.QVBoxLayout(title_container)
 
         # 首頁標題
-        title_label = QtWidgets.QLabel("呱呱呱呱呱")
+        title_label = QtWidgets.QLabel(index_name)
         title_label.setAlignment(QtCore.Qt.AlignCenter)
         title_label.setStyleSheet("""
             QLabel {
@@ -257,38 +258,6 @@ class MainWindow(QtWidgets.QMainWindow):
         
         self.serial_thread = None
 
-# 版面配置
-    def create_section(self, parent_layout, label_text, placeholder):
-        section_layout = QtWidgets.QVBoxLayout()
-        # 標籤設置
-        label = QtWidgets.QLabel(label_text)
-        label.setAlignment(QtCore.Qt.AlignCenter)
-        label.setStyleSheet("""
-            QLabel {
-                font-size: 24px;  /* 放大字體 */
-                font-weight: bold;  /* 粗體 */
-                color: #333333;  /* 深灰色文字 */
-                padding: 5px;
-                font-family: "Microsoft YaHei", "微軟正黑體";  /* 設置字體 */
-            }
-        """)
-        
-        # 文字編輯框
-        text_edit = QtWidgets.QTextEdit()
-        text_edit.setPlaceholderText(placeholder)
-        text_edit.setStyleSheet("""
-            QTextEdit {
-                border-radius: 10px;
-                border: 2px solid #ccc;
-                padding: 5px;
-                font-size: 16px;  /* 編輯框內文字大小 */
-            }
-        """)
-        
-        section_layout.addWidget(label)
-        section_layout.addWidget(text_edit)
-        parent_layout.addLayout(section_layout)
-
 # 首頁
     def home_index_selected(self):
         central_widget = QtWidgets.QWidget(self)
@@ -312,7 +281,7 @@ class MainWindow(QtWidgets.QMainWindow):
         title_container = QtWidgets.QWidget()
         title_layout = QtWidgets.QVBoxLayout(title_container)
         
-        title_label = QtWidgets.QLabel("呱呱呱呱呱")
+        title_label = QtWidgets.QLabel(index_name)
         title_label.setAlignment(QtCore.Qt.AlignCenter)
         title_label.setStyleSheet("""
             QLabel {
