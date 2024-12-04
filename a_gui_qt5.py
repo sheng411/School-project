@@ -6,11 +6,11 @@ from PyQt5.QtCore import QThread, Qt, pyqtSignal
 import serial
 import serial.tools.list_ports
 
-# v 6.2
+# v 7.0
 
 '''     環境設定     '''
 title_name = "computer-A"   # 視窗標題
-window_size = (900, 700)    # width, height
+window_size = (850, 650)    # width, height
 icon_path = os.path.join(os.path.dirname(__file__), "icon.png")     #先抓當前檔案的路徑,再加上icon
 background_path=os.path.join(os.path.dirname(__file__), "background.jpg")  #背景圖片
 background_path_fixed = background_path.replace("\\", "/")  #斜線翻轉
@@ -55,9 +55,11 @@ class MainWindow(QtWidgets.QMainWindow):
         super().__init__()
 
         self.connect_check=False
+        self.username=""
         self.setObjectName("MainWindow")
         self.setWindowTitle(title_name)
         self.resize(window_size[0], window_size[1])
+        self.clear_window()
 
         # 設定背景圖片
         self.setStyleSheet(f"""
@@ -234,35 +236,13 @@ class MainWindow(QtWidgets.QMainWindow):
         main_layout.addLayout(login_layout)
         main_layout.addStretch()  # 添加彈性空間，使標題置於上方
 
-
-        # 建立選單列
-        menubar = self.menuBar()
-        input_menu = menubar.addMenu('頁面選擇')
-        
-        # 首頁
-        home_index_action = QtWidgets.QAction('回首頁', self)
-        home_index_action.triggered.connect(self.home_index_selected)
-
-        # 文字輸入
-        text_input_action = QtWidgets.QAction('文字輸入', self)
-        text_input_action.triggered.connect(self.text_input_selected)
-        
-        # 檔案輸入
-        file_input_action = QtWidgets.QAction('檔案輸入', self)
-        file_input_action.triggered.connect(self.file_input_selected)
-        
-        # 將動作加入選單
-        input_menu.addAction(home_index_action)
-        input_menu.addAction(text_input_action)
-        input_menu.addAction(file_input_action)
-        
         self.serial_thread = None
 
 # 首頁
     def home_index_selected(self):
         central_widget = QtWidgets.QWidget(self)
         self.setCentralWidget(central_widget)
-        self.setStyleSheet("")
+        self.clear_window()
 
         main_layout = QtWidgets.QVBoxLayout(central_widget)
 
@@ -438,10 +418,11 @@ class MainWindow(QtWidgets.QMainWindow):
         main_layout.addLayout(port_control)
         main_layout.addLayout(login_layout)
         main_layout.addStretch()
-
-    # 文字選單區
+    '''
+# 文字選單區
     def text_input_selected(self):
-        self.setStyleSheet("")
+        self.username = self.name_input.text()
+        clear_window()
         central_widget = QtWidgets.QWidget(self)
         self.setCentralWidget(central_widget)
 
@@ -508,7 +489,7 @@ class MainWindow(QtWidgets.QMainWindow):
         right_layout.addWidget(clear_button, 1, QtCore.Qt.AlignTop)  # 使用 AlignTop 確保按鈕在頂部
         main_layout.addWidget(right_container)
 
-    # 建立區塊並返回文字編輯框的引用
+# 建立區塊並返回文字編輯框的引用
     def create_section_with_return(self, parent_layout, label_text, placeholder):
         section_layout = QtWidgets.QVBoxLayout()
         
@@ -539,7 +520,254 @@ class MainWindow(QtWidgets.QMainWindow):
         parent_layout.addLayout(section_layout)
         
         return text_edit
+    '''
 
+# 文字區改版
+    def text_input_selected(self):
+        self.clear_window()
+        self.username = self.name_input.text()
+    # 主窗口的Widget
+        central_widget = QtWidgets.QLabel()
+        central_widget = QtWidgets.QWidget(self)
+        self.setCentralWidget(central_widget)
+
+        main_layout = QtWidgets.QVBoxLayout(central_widget)
+
+    # 新增選單欄
+        menu_bar = self.menuBar()
+        view_menu = QtWidgets.QMenu("功能", self)
+        menu_bar.addMenu(view_menu)
+
+        # 新增「滑到底部」按鈕
+        scroll_to_bottom_action = view_menu.addAction("滑到底部")
+        scroll_to_bottom_action.triggered.connect(self.scroll_to_bottom)
+
+    # 用戶名稱區域
+        username_label = QtWidgets.QLabel(f"用戶名稱: {self.username}")
+        username_label.setAlignment(Qt.AlignLeft)
+        username_label.setStyleSheet("""
+            QLabel {
+                font-size: 20px;
+                font-weight: bold;
+                color: #333333;
+                font-family: "Microsoft YaHei", "微軟正黑體";
+            }
+        """)
+        main_layout.addWidget(username_label)
+
+    # 聊天顯示區域
+        self.chat_area = QtWidgets.QScrollArea(self)
+        self.chat_area.setWidgetResizable(True)
+        self.chat_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self.chat_area.setStyleSheet("""
+            QScrollArea {
+                border: 2px solid #ccc;
+                border-radius: 10px;
+                background: white;
+            }
+        """)
+
+    # 聊天內容
+        self.chat_content = QtWidgets.QWidget()
+        self.chat_content_layout = QtWidgets.QVBoxLayout()
+        self.chat_content.setLayout(self.chat_content_layout)
+        self.chat_area.setWidget(self.chat_content)
+        main_layout.addWidget(self.chat_area)
+
+    # 底部輸入和按鈕區域
+        input_layout = QtWidgets.QHBoxLayout()
+
+    # 輸入框
+        self.input_field = QtWidgets.QLineEdit(self)
+        self.input_field.setPlaceholderText("輸入訊息...")
+        self.input_field.setStyleSheet("""
+            QLineEdit {
+                border: 2px solid #ccc;
+                border-radius: 10px;
+                padding: 5px;
+                font-size: 16px;
+            }
+        """)
+
+    # 文件欄位
+        self.file_label = QtWidgets.QLabel("未選擇檔案")
+        self.file_label.setStyleSheet("""
+            QLabel {
+                border: 2px solid #ccc;
+                border-radius: 10px;
+                padding: 5px;
+                font-size: 16px;
+                min-width: 150px;
+                font-family: "Microsoft YaHei", "微軟正黑體";
+            }
+        """)
+        self.file_label.setAlignment(Qt.AlignCenter)
+
+    # 瀏覽按鈕
+        browse_button = QtWidgets.QPushButton("瀏覽")
+        browse_button.setFixedSize(100, 40)
+        browse_button.clicked.connect(self.open_file_dialog)
+        browse_button.setStyleSheet("""
+            QPushButton {
+                border-radius: 17px;
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                font-size: 16px;
+                font-family: "Microsoft YaHei", "微軟正黑體";
+            }
+            QPushButton:hover {
+                background-color: #008000;
+            }
+        """)
+
+    # 傳送按鈕
+        send_button = QtWidgets.QPushButton("傳送")
+        send_button.setFixedSize(100, 40)
+        send_button.clicked.connect(self.send_message)
+        send_button.setStyleSheet("""
+            QPushButton {
+                border-radius: 17px;
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                font-size: 16px;
+                font-family: "Microsoft YaHei", "微軟正黑體";
+            }
+            QPushButton:hover {
+                background-color: #008000;
+            }
+        """)
+
+        input_layout.addWidget(self.input_field)
+        input_layout.addWidget(self.file_label)
+        input_layout.addWidget(browse_button)
+        input_layout.addWidget(send_button)
+        main_layout.addLayout(input_layout)
+        central_widget.setLayout(main_layout)
+
+    # 設定布局的邊距和間距
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(10)
+
+#選擇檔案
+    def open_file_dialog(self):
+        options = QtWidgets.QFileDialog.Options()
+        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "選擇文件", "", "All Files (*);;Text Files (*.txt)", options=options)
+        if file_path:
+            self.on_file_selected(file_path)
+
+    def on_file_selected(self, file_path):
+        file_name = os.path.basename(file_path)
+        self.file_label.setText(file_name)
+
+#傳送訊息
+    def send_message(self):
+        # 送文字訊息
+        message = self.input_field.text()
+        if message.strip():
+            try:
+                #message+="\n"
+                self.serial_port.write(message.encode('UTF-8'))
+                self.show_message(message, is_self=True)
+                print(f"送出訊息-> {message}")
+                self.input_field.clear()
+            except Exception as e:
+                print(f"Error sending message: {e}")
+        # 送檔案
+        if hasattr(self, 'file_label') and self.file_label.text() != "未選擇檔案":
+            try:
+                file_path = self.file_label.text()
+                # 讀取檔案內容
+                with open(file_path, 'rb') as file:
+                    file_data = file.read()
+                    # 傳送檔案名稱和大小訊息
+                    file_info = f"FILE:{os.path.basename(file_path)}:{len(file_data)}"
+                    self.serial_port.write(file_info.encode('UTF-8') + b'\n')
+                    # 傳送檔案內容
+                    self.serial_port.write(file_data)
+                    # 顯示在聊天視窗
+                    self.show_message(f"已傳送檔案: {os.path.basename(file_path)}", is_self=True)
+                    print(f"檔案傳送成功: {file_path}")
+                    # 清除檔案選擇
+                    self.file_label.setText("未選擇檔案")
+            except Exception as e:
+                print(f"檔案傳送錯誤: {e}")
+                QtWidgets.QMessageBox.warning(self, "錯誤", f"檔案傳送失敗: {str(e)}")
+
+# 接收訊息
+    def start_listening(self):
+        #self.serial_port = self.port_selector.currentText()
+        if hasattr(self, 'serial_port') and self.serial_port.is_open:
+            self.serial_thread = SerialReaderThread(self.serial_port)
+            self.serial_thread.data_received.connect(self.receive_message)
+            self.serial_thread.start()
+        else:
+            print("Serial port not connected")
+
+    def receive_message(self, message):
+        # 接收到的訊息顯示在左側
+        self.show_message(message, is_self=False)
+
+    def create_message_label(self, text, is_self=True):
+        # 建立訊息標籤
+        message_label = QtWidgets.QLabel(text)
+        message_label.setWordWrap(True)  # 啟用自動換行
+        message_label.setMaximumWidth(500)  # 最大寬度設為500
+        
+        # 使用 sizeHint 取得文字實際所需寬度
+        label_width = message_label.fontMetrics().boundingRect(text).width() + 40  # 加上padding
+        
+        # 如果文字寬度小於500，則使用實際寬度
+        if label_width < 500:
+            message_label.setMinimumWidth(min(label_width, 500))
+        else:
+            message_label.setMinimumWidth(100)  # 設定最小寬度避免過窄
+        
+        # 設定文字換行策略
+        message_label.setTextFormat(Qt.AutoText)
+        message_label.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum)
+        
+        # 設定樣式
+        style = """
+            QLabel {
+                background-color: #%s;
+                border-radius: 10px;
+                padding: 15px;
+                margin: 5px;
+                word-wrap: break-word;
+                white-space: pre-wrap;
+                line-height: 1.2;
+                font-size: 14px;
+            }
+        """ % ("DCF8C6" if is_self else "FFFFFF")
+        
+        message_label.setStyleSheet(style)
+        message_label.adjustSize()
+        
+        # 建立水平布局
+        message_layout = QtWidgets.QHBoxLayout()
+        message_layout.setContentsMargins(0, 0, 0, 0)
+        
+        if is_self:
+            message_layout.addStretch()
+            message_layout.addWidget(message_label)
+        else:
+            message_layout.addWidget(message_label)
+            message_layout.addStretch()
+        
+        return message_layout
+
+    def show_message(self, text, is_self=True):
+        # 將訊息加入聊天區域
+        message_layout = self.create_message_label(text, is_self)
+        self.chat_content_layout.addLayout(message_layout)
+
+    #聊天室到底部
+    def scroll_to_bottom(self):
+        self.chat_area.verticalScrollBar().setValue(self.chat_area.verticalScrollBar().maximum())
+
+    '''
 # 送訊息
     def send_message(self):
         message = self.send_area.toPlainText()
@@ -571,10 +799,11 @@ class MainWindow(QtWidgets.QMainWindow):
     def display_data(self, data):
             self.receive_area.append(data)
             print(f"接收訊息-> {data}")
+    '''
 
 # 檔案選單區
     def file_input_selected(self):
-        self.setStyleSheet("")
+        self.clear_window()
         print("選擇檔案輸入模式")
         # 清除現有的中央元件
         old_widget = self.centralWidget()
@@ -758,6 +987,34 @@ class MainWindow(QtWidgets.QMainWindow):
             self.port_combo.setEnabled(True)
             self.connect_check=False
             print("已斷開序列埠連接")
+
+#清除視窗
+    def clear_window(self):
+        self.setStyleSheet("")
+        self.menuBar().clear()
+        # 建立選單列
+        menubar = self.menuBar()
+        input_menu = menubar.addMenu('頁面選擇')
+        
+        # 首頁
+        home_index_action = QtWidgets.QAction('回首頁', self)
+        home_index_action.triggered.connect(self.home_index_selected)
+
+        # 文字輸入
+        text_input_action = QtWidgets.QAction('文字輸入', self)
+        text_input_action.triggered.connect(self.text_input_selected)
+        
+        # 檔案輸入
+        file_input_action = QtWidgets.QAction('檔案輸入', self)
+        file_input_action.triggered.connect(self.file_input_selected)
+        
+        # 將動作加入選單
+        input_menu.addAction(home_index_action)
+        input_menu.addSeparator()   # 分隔線
+        input_menu.addAction(text_input_action)
+        input_menu.addAction(file_input_action)
+
+
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
