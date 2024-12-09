@@ -239,8 +239,8 @@ void AES_setting(){
 
 String AES_Encryption(String str){
     uint64_t len = str.length();
-    Serial.print("len: ");
-    Serial.println(len);
+    //Serial.print("len: ");
+    //Serial.println(len);
     uint64_t num_blocks = (len + 15) / 16;
     while (len % 16 != 0) {
         str += ' '; // 用空格補齊
@@ -264,12 +264,12 @@ String AES_Encryption(String str){
             state[i] = byte_array[i * 4] << 24 | byte_array[i * 4 + 1] << 16 |
             byte_array[i * 4 + 2] << 8 | byte_array[i * 4 + 3];
         }
-    
+        /*
         // 顯示加密前 state
         Serial.println("加密前 state:");
         for (int i = 0; i < 4; i++) {
             Serial.println(state[i], HEX);
-        }
+        }*/
 
         // AES 加密
         cipher(state, nr, s_box, w);
@@ -280,35 +280,35 @@ String AES_Encryption(String str){
                 byte_array[i * 4 + j] = (state[i] >> (24 - j * 8)) & 0xFF;
             }
         }
-
+        /*
         // 顯示加密後 state
         Serial.println("加密後 state:");
         for (int i = 0; i < 4; i++) {
             Serial.println(state[i], HEX);
-        }
+        }*/
 
         // 加密結果轉換為字串
         for (int i = 0; i < 16; i++) {
             encrypted_text += (char)byte_array[i];
         }
-        Serial.print("[]encrypted_text: ");
-        Serial.println(encrypted_text);
+        //Serial.print("[]encrypted_text: ");
+        //Serial.println(encrypted_text);
     }
     
 
-    Serial.print("加密後字串: ");
+    //Serial.print("加密後字串: ");
     encrypted_text.trim(); // 去除補齊的空格
-    Serial.println(encrypted_text);
+    //Serial.println(encrypted_text);
     return encrypted_text;
 }
 
 String AES_Decryption(String str){
     str.remove(str.length()-1);
-    Serial.print("收到的加密字串: ");
-    Serial.println(str);
+    //Serial.print("收到的加密字串: ");
+    //Serial.println(str);
     uint64_t len = str.length();
-    Serial.print("len: ");
-    Serial.println(len);
+    //Serial.print("len: ");
+    //Serial.println(len);
     uint64_t num_blocks = (len + 15) / 16;
     while (len % 16 != 0) {
         str += ' '; // 用空格補齊
@@ -321,8 +321,8 @@ String AES_Decryption(String str){
     for (uint64_t block = 0; block < num_blocks; block++) {
         String block_str = str.substring(block * 16, (block + 1) * 16);
         const char *utf8Str = block_str.c_str();
-        Serial.print("block_str: ");
-        Serial.println(block_str);
+        //Serial.print("block_str: ");
+        //Serial.println(block_str);
 
         for (int i = 0; i < 16; i++) {
             byte_array[i] = (uint8_t)utf8Str[i];
@@ -354,8 +354,8 @@ String AES_Decryption(String str){
         for (int i = 0; i < 16; i++) {
             decrypted_text += (char)byte_array[i];
         }
-        Serial.print("[]dncrypted_text: ");
-        Serial.println(decrypted_text);
+        //Serial.print("[]dncrypted_text: ");
+        //Serial.println(decrypted_text);
     }
 
     //Serial.print("解密後字串: ");
@@ -374,9 +374,9 @@ void receive_msg(){
         while (client.connected()) {
             if (client.available()) {
                 String message = client.readStringUntil('\n');
-                Serial.print("[receive]");
-                Serial.print(WiFi.SSID());
-                Serial.print(" : ");
+                //Serial.print("[receive]");
+                //Serial.print(WiFi.SSID());
+                //Serial.print(" : ");
 
                 // 解密後清理原始訊息
                 String decrypted = AES_Decryption(message);
@@ -409,7 +409,8 @@ void send_msg(){
         String message = Serial.readStringUntil('\n');
         message.trim();
         if (!message.isEmpty()) {
-            Serial.println("Sending to B:" + message);
+            //Serial.println("Sending to B:" + message);
+            Serial.println(message);
             if (client.connect(WiFi.gatewayIP(), c_ServerPort)) {
                 String encrypted = AES_Encryption(message);
                 message.clear();
