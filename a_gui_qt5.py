@@ -6,7 +6,7 @@ from PyQt5.QtCore import QThread, Qt, pyqtSignal
 import serial
 import serial.tools.list_ports
 
-# v 7.0
+# v 8.0
 
 '''     環境設定     '''
 title_name = "computer-A"   # 視窗標題
@@ -16,6 +16,9 @@ background_path=os.path.join(os.path.dirname(__file__), "background.jpg")  #背�
 background_path_fixed = background_path.replace("\\", "/")  #斜線翻轉
 serial_baud=115200
 index_name="呱呱呱呱呱" #首頁標題
+img_type=[".png", ".jpg", ".jpeg"]  #圖片格式
+txt_type=".txt"  #文字格式
+
 
 class SerialReaderThread(QThread):
     data_received = pyqtSignal(str)  # 發送訊息到主介面
@@ -60,6 +63,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setWindowTitle(title_name)
         self.resize(window_size[0], window_size[1])
         self.clear_window()
+        self.current_file_path = None  # 新增這行來儲存完整路徑
 
         # 設定背景圖片
         self.setStyleSheet(f"""
@@ -658,6 +662,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.on_file_selected(file_path)
 
     def on_file_selected(self, file_path):
+        self.current_file_path = file_path  # 儲存完整路徑
         file_name = os.path.basename(file_path)
         self.file_label.setText(file_name)
 
@@ -677,20 +682,44 @@ class MainWindow(QtWidgets.QMainWindow):
         # 送檔案
         if hasattr(self, 'file_label') and self.file_label.text() != "未選擇檔案":
             try:
-                file_path = self.file_label.text()
-                # 讀取檔案內容
-                with open(file_path, 'rb') as file:
-                    file_data = file.read()
-                    # 傳送檔案名稱和大小訊息
-                    file_info = f"FILE:{os.path.basename(file_path)}:{len(file_data)}"
-                    self.serial_port.write(file_info.encode('UTF-8') + b'\n')
-                    # 傳送檔案內容
-                    self.serial_port.write(file_data)
-                    # 顯示在聊天視窗
-                    self.show_message(f"已傳送檔案: {os.path.basename(file_path)}", is_self=True)
-                    print(f"檔案傳送成功: {file_path}")
-                    # 清除檔案選擇
-                    self.file_label.setText("未選擇檔案")
+                file_path = os.path.abspath(self.current_file_path).replace("\\", "/")
+                print(f"檔案路徑: {file_path}")
+                # 取得檔案副檔名
+                _, file_extension = os.path.splitext(file_path)
+                file_extension = file_extension.lower()
+
+                if file_extension == txt_type:
+                # 文字檔處理
+                    with open(file_path, 'r', encoding='utf-8') as file:
+                        file_data = file.read()
+                        file_info = f"txt:{os.path.basename(file_path)}:{len(file_data)}"
+                        self.serial_port.write(file_info.encode('UTF-8'))
+                        self.serial_port.write(file_data.encode('UTF-8'))
+                        
+                        print(file_info)
+                        print("File content in hex:")
+                        # 將檔案內容逐字節以十六進制顯示
+                        for byte in file_data.encode('UTF-8'):
+                            print(f"0x{byte:02X} ", end="")
+                    '''
+                elif file_extension in img_type:
+                # 圖片檔處理
+                    with open(file_path, 'rb') as file:
+                        file_data = file.read()
+                        file_info = f"img:{os.path.basename(file_path)}:{len(file_data)}"
+                        self.serial_port.write(file_info.encode('UTF-8'))
+                        self.serial_port.write(file_data)
+                    '''
+                else:
+                    print(f"不支援的檔案類型: {file_extension}")
+                    return
+
+                # 顯示在聊天視窗
+                self.show_message(f"已傳送檔案: {os.path.basename(file_path)}", is_self=True)
+                print(f"檔案傳送成功: {file_path}")        
+
+                # 清除檔案選擇
+                self.file_label.setText("未選擇檔案")
             except Exception as e:
                 print(f"檔案傳送錯誤: {e}")
                 QtWidgets.QMessageBox.warning(self, "錯誤", f"檔案傳送失敗: {str(e)}")
@@ -706,8 +735,59 @@ class MainWindow(QtWidgets.QMainWindow):
             print("Serial port not connected")
 
     def receive_message(self, message):
-        # 接收到的訊息顯示在左側
-        self.show_message(message, is_self=False)
+        try:
+            # 檢查是否為檔案傳輸的訊息
+            if message.startswith("txt:") or message.startswith("img:"):
+                try:
+                    # 解析檔案資訊
+                    file_type, file_name, file_size = message.split(":")
+                    file_size = int(file_size)
+                    
+                    # 根據檔案類型處理
+                    if file_type == "txt":
+                        # 接收文字檔內容
+                        received_data = self.serial_port.read(file_size).decode('utf-8')
+                        self.show_message(f"收到文字檔: {file_name}\n內容:\n{received_data}", is_self=False)
+                        
+                    elif file_type == "img":
+                        # 接收圖片檔內容
+                        received_data = self.serial_port.read(file_size)
+                        temp_path = f"received_{file_name}"
+                        with open(temp_path, 'wb') as f:
+                            f.write(received_data)
+                        
+                        # 在聊天視窗中顯示圖片
+                        pixmap = QtGui.QPixmap(temp_path)
+                        if not pixmap.isNull():
+                            # 建立圖片標籤
+                            img_label = QtWidgets.QLabel()
+                            img_label.setPixmap(pixmap.scaled(
+                                300, 200,  # 設定最大尺寸
+                                Qt.KeepAspectRatio,
+                                Qt.SmoothTransformation
+                            ))
+                            
+                            # 建立訊息布局
+                            message_layout = QtWidgets.QHBoxLayout()
+                            message_layout.addWidget(img_label)
+                            message_layout.addStretch()
+                            
+                            # 添加到聊天內容
+                            self.chat_content_layout.addLayout(message_layout)
+                            self.show_message(f"收到圖片: {file_name}", is_self=False)
+                        
+                        # 可選：刪除暫存檔案
+                        # os.remove(temp_path)
+                except ValueError:
+                    # 如果分割或轉換失敗，就當作普通訊息處理
+                    self.show_message(message, is_self=False)
+            else:
+                # 一般文字訊息
+                self.show_message(message, is_self=False)
+                
+        except Exception as e:
+            print(f"接收訊息處理錯誤: {e}")
+            self.show_message(f"接收訊息錯誤: {str(e)}", is_self=False)
 
     def create_message_label(self, text, is_self=True):
         # 建立訊息標籤
@@ -766,40 +846,6 @@ class MainWindow(QtWidgets.QMainWindow):
     #聊天室到底部
     def scroll_to_bottom(self):
         self.chat_area.verticalScrollBar().setValue(self.chat_area.verticalScrollBar().maximum())
-
-    '''
-# 送訊息
-    def send_message(self):
-        message = self.send_area.toPlainText()
-        if message:
-            try:
-                #message+="\n"
-                self.serial_port.write(message.encode('UTF-8'))
-                print(f"送出訊息-> {message}")
-                #self.receive_area.setText(message)
-                self.send_area.clear()
-            except Exception as e:
-                print(f"Error sending message: {e}")
-
-# 清除訊息
-    def clear_message(self):
-        self.receive_area.clear()
-
-# 接收訊息
-    def start_listening(self):
-        #self.serial_port = self.port_selector.currentText()
-        if hasattr(self, 'serial_port') and self.serial_port.is_open:
-            self.serial_thread = SerialReaderThread(self.serial_port)
-            self.serial_thread.data_received.connect(self.display_data)
-            self.serial_thread.start()
-        else:
-            print("Serial port not connected")
-
-# 顯示資料
-    def display_data(self, data):
-            self.receive_area.append(data)
-            print(f"接收訊息-> {data}")
-    '''
 
 # 檔案選單區
     def file_input_selected(self):
@@ -1013,8 +1059,6 @@ class MainWindow(QtWidgets.QMainWindow):
         input_menu.addSeparator()   # 分隔線
         input_menu.addAction(text_input_action)
         input_menu.addAction(file_input_action)
-
-
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
