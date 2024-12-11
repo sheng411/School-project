@@ -7,7 +7,7 @@ import serial
 import serial.tools.list_ports
 import json
 
-# v 8.1
+# v 8.2
 
 '''     環境設定     '''
 title_name = "computer-A"   # 視窗標題
@@ -762,8 +762,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     self.show_message(f"收到文字檔:\n{data['file_name']}\n\n內容:\n{data['file_data']}", is_self=False)
                     
                 elif data["file_type"] == "img":
-                    # 解碼 base64 圖片
-                    img_data = base64.b64decode(data["file_data"])
+                    img_data = data["file_data"]
                     temp_path = f"received_{data['file_name']}"
                     with open(temp_path, 'wb') as f:
                         f.write(img_data)
