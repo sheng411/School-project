@@ -5,8 +5,9 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import QThread, Qt, pyqtSignal
 import serial
 import serial.tools.list_ports
+import json
 
-# v 8.0
+# v 8.1
 
 '''     環境設定     '''
 title_name = "computer-A"   # 視窗標題
@@ -668,61 +669,74 @@ class MainWindow(QtWidgets.QMainWindow):
 
 #傳送訊息
     def send_message(self):
-        # 送文字訊息
-        message = self.input_field.text()
-        if message.strip():
-            try:
-                #message+="\n"
-                self.serial_port.write(message.encode('UTF-8'))
-                self.show_message(message, is_self=True)
-                print(f"送出訊息-> {message}")
+        try:
+            # 準備 JSON 資料
+            message_data = {
+                "sender": self.username,
+                "timestamp": str(QtCore.QDateTime.currentDateTime().toString("yyyy-MM-dd hh:mm:ss"))
+            }
+
+            # 處理文字訊息
+            if self.input_field.text().strip():
+                message_data.update({
+                    "file_type": "text",
+                    "file_data": self.input_field.text(),
+                    "content_type": "message"
+                })
+                # 轉換成 JSON 並傳送
+                json_data = json.dumps(message_data, ensure_ascii=False)
+                self.serial_port.write(json_data.encode('UTF-8'))
+                self.show_message(self.input_field.text(), is_self=True)
+                print(f"送出訊息-> {json_data}")
                 self.input_field.clear()
-            except Exception as e:
-                print(f"Error sending message: {e}")
-        # 送檔案
-        if hasattr(self, 'file_label') and self.file_label.text() != "未選擇檔案":
-            try:
+
+            # 處理檔案
+            if hasattr(self, 'file_label') and self.file_label.text() != "未選擇檔案":
                 file_path = os.path.abspath(self.current_file_path).replace("\\", "/")
-                print(f"檔案路徑: {file_path}")
-                # 取得檔案副檔名
                 _, file_extension = os.path.splitext(file_path)
                 file_extension = file_extension.lower()
 
                 if file_extension == txt_type:
-                # 文字檔處理
                     with open(file_path, 'r', encoding='utf-8') as file:
                         file_data = file.read()
-                        file_info = f"txt:{os.path.basename(file_path)}:{len(file_data)}"
-                        self.serial_port.write(file_info.encode('UTF-8'))
-                        self.serial_port.write(file_data.encode('UTF-8'))
+                        message_data.update({
+                            "file_type": "txt",
+                            "file_name": os.path.basename(file_path),
+                            "file_data": file_data,
+                            "file_size": len(file_data.encode('utf-8')),
+                            "content_type": "file"
+                        })
+                        # 轉換成 JSON 並傳送
+                        json_data = json.dumps(message_data, ensure_ascii=False)
+                        self.serial_port.write(json_data.encode('UTF-8'))
                         
-                        print(file_info)
-                        print("File content in hex:")
-                        # 將檔案內容逐字節以十六進制顯示
-                        for byte in file_data.encode('UTF-8'):
-                            print(f"0x{byte:02X} ", end="")
-                    '''
+                        print(f"檔案資訊-> {json_data}")
+                        self.show_message(f"已傳送檔案: {os.path.basename(file_path)}", is_self=True)
+                        self.file_label.setText("未選擇檔案")
+
                 elif file_extension in img_type:
-                # 圖片檔處理
                     with open(file_path, 'rb') as file:
                         file_data = file.read()
-                        file_info = f"img:{os.path.basename(file_path)}:{len(file_data)}"
-                        self.serial_port.write(file_info.encode('UTF-8'))
-                        self.serial_port.write(file_data)
-                    '''
-                else:
-                    print(f"不支援的檔案類型: {file_extension}")
-                    return
+                        bytecode=list(file_data)
+                        print(bytecode)
+                        message_data.update({
+                            "file_type": "img",
+                            "file_name": os.path.basename(file_path),
+                            "file_data": bytecode,
+                            "file_size": len(file_data),
+                            "content_type": "file"
+                        })
+                        # 轉換成 JSON 並傳送
+                        json_data = json.dumps(message_data, ensure_ascii=False)
+                        self.serial_port.write(json_data.encode('UTF-8'))
+                        
+                        print(f"檔案資訊-> {json_data}")
+                        self.show_message(f"已傳送圖片: {os.path.basename(file_path)}", is_self=True)
+                        self.file_label.setText("未選擇檔案")
 
-                # 顯示在聊天視窗
-                self.show_message(f"已傳送檔案: {os.path.basename(file_path)}", is_self=True)
-                print(f"檔案傳送成功: {file_path}")        
-
-                # 清除檔案選擇
-                self.file_label.setText("未選擇檔案")
-            except Exception as e:
-                print(f"檔案傳送錯誤: {e}")
-                QtWidgets.QMessageBox.warning(self, "錯誤", f"檔案傳送失敗: {str(e)}")
+        except Exception as e:
+            print(f"傳送錯誤: {e}")
+            QtWidgets.QMessageBox.warning(self, "錯誤", f"傳送失敗: {str(e)}")
 
 # 接收訊息
     def start_listening(self):
@@ -736,55 +750,40 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def receive_message(self, message):
         try:
-            # 檢查是否為檔案傳輸的訊息
-            if message.startswith("txt:") or message.startswith("img:"):
-                try:
-                    # 解析檔案資訊
-                    file_type, file_name, file_size = message.split(":")
-                    file_size = int(file_size)
-                    
-                    # 根據檔案類型處理
-                    if file_type == "txt":
-                        # 接收文字檔內容
-                        received_data = self.serial_port.read(file_size).decode('utf-8')
-                        self.show_message(f"收到文字檔: {file_name}\n內容:\n{received_data}", is_self=False)
-                        
-                    elif file_type == "img":
-                        # 接收圖片檔內容
-                        received_data = self.serial_port.read(file_size)
-                        temp_path = f"received_{file_name}"
-                        with open(temp_path, 'wb') as f:
-                            f.write(received_data)
-                        
-                        # 在聊天視窗中顯示圖片
-                        pixmap = QtGui.QPixmap(temp_path)
-                        if not pixmap.isNull():
-                            # 建立圖片標籤
-                            img_label = QtWidgets.QLabel()
-                            img_label.setPixmap(pixmap.scaled(
-                                300, 200,  # 設定最大尺寸
-                                Qt.KeepAspectRatio,
-                                Qt.SmoothTransformation
-                            ))
-                            
-                            # 建立訊息布局
-                            message_layout = QtWidgets.QHBoxLayout()
-                            message_layout.addWidget(img_label)
-                            message_layout.addStretch()
-                            
-                            # 添加到聊天內容
-                            self.chat_content_layout.addLayout(message_layout)
-                            self.show_message(f"收到圖片: {file_name}", is_self=False)
-                        
-                        # 可選：刪除暫存檔案
-                        # os.remove(temp_path)
-                except ValueError:
-                    # 如果分割或轉換失敗，就當作普通訊息處理
-                    self.show_message(message, is_self=False)
-            else:
-                # 一般文字訊息
-                self.show_message(message, is_self=False)
+            # 解析 JSON 資料
+            data = json.loads(message)
+            
+            # 根據內容類型處理
+            if data["content_type"] == "message":
+                self.show_message(data["file_data"], is_self=False)
                 
+            elif data["content_type"] == "file":
+                if data["file_type"] == "txt":
+                    self.show_message(f"收到文字檔:\n{data['file_name']}\n\n內容:\n{data['file_data']}", is_self=False)
+                    
+                elif data["file_type"] == "img":
+                    # 解碼 base64 圖片
+                    img_data = base64.b64decode(data["file_data"])
+                    temp_path = f"received_{data['file_name']}"
+                    with open(temp_path, 'wb') as f:
+                        f.write(img_data)
+                    
+                    pixmap = QtGui.QPixmap(temp_path)
+                    if not pixmap.isNull():
+                        img_label = QtWidgets.QLabel()
+                        img_label.setPixmap(pixmap.scaled(300, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                        
+                        message_layout = QtWidgets.QHBoxLayout()
+                        message_layout.addWidget(img_label)
+                        message_layout.addStretch()
+                        
+                        self.chat_content_layout.addLayout(message_layout)
+                        self.show_message(f"收到圖片: {data['file_name']}", is_self=False)
+                    
+        except json.JSONDecodeError as e:
+            print(f"JSON 解析錯誤: {e}")
+            self.show_message(message, is_self=False)  # 當作普通文字處理
+            
         except Exception as e:
             print(f"接收訊息處理錯誤: {e}")
             self.show_message(f"接收訊息錯誤: {str(e)}", is_self=False)
