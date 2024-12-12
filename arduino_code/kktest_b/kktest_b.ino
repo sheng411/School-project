@@ -409,8 +409,8 @@ void send_msg(){
         String message = Serial.readStringUntil('\n');
         message.trim();
         if (!message.isEmpty()) {
-             //Serial.println("Sending to A:" + message);
-            Serial.println(message);
+            //Serial.println("Sending to A:" + message);
+            //Serial.println(message);
             if (client.connect(WiFi.gatewayIP(), c_ServerPort)) {
                 String encrypted = AES_Encryption(message);
                 message.clear();
