@@ -3,6 +3,9 @@
 #include <iostream>
 #include <string>
 #include <cstdlib>
+#include <ArduinoJson.h>
+#include <SPI.h>
+#include <SD.h>
 #include "ECC.h"
 #include "AES.h"
 #define LED_PIN LED_BUILTIN
@@ -17,6 +20,9 @@ uint64_t rc[10] = {0};
 uint64_t w[(10 + 1) * 4] = {0};
 uint64_t ecc_key[16];
 int current_byte_count = 0;  // 當前區塊中的總字節數
+
+//SD 接腳
+const int chipSelect = 5;
 using namespace std;
 
 //local
@@ -363,7 +369,7 @@ String AES_Decryption(String str){
     //Serial.println(decrypted_text);
     return decrypted_text;
 }
-
+/*
 //message receive and send
 void receive_msg(){
     static uint8_t buffer_spase[16];
@@ -434,6 +440,212 @@ void send_msg(){
         }
     }
 }
+*/
+/*   測試用   */
+void receive_msg() {
+    static uint8_t buffer_spase[16];
+    WiFiClient client = server.available();
+    if (client) {
+        while (client.connected()) {
+            if (client.available()) {
+                String message = client.readStringUntil('\n');
+                
+                // 解析 JSON
+                DynamicJsonDocument doc(1024);
+                DeserializationError error = deserializeJson(doc, message);
+                
+                if (!error) {
+                    const char* content_type = doc["content_type"];
+                    const char* file_type = doc["file_type"];
+                    
+                    if (strcmp(content_type, "file") == 0) {
+                        // 處理檔案
+                        if (strcmp(file_type, "img") == 0 || strcmp(file_type, "txt") == 0) {
+                            // 將接收的資料寫入暫存檔
+                            const char* temp_input = "temp_encrypted.dat";
+                            const char* temp_output = "temp_decrypted.dat";
+                            File tempFile = SD.open(temp_input, FILE_WRITE);
+                            tempFile.print(doc["file_data"].as<String>());
+                            tempFile.close();
+                            
+                            // 使用 decryptFile 解密
+                            decryptFile(temp_input, temp_output);
+                            
+                            // 讀取解密後的檔案
+                            File decryptedFile = SD.open(temp_output, FILE_READ);
+                            String decrypted = "";
+                            while (decryptedFile.available()) {
+                                decrypted += (char)decryptedFile.read();
+                            }
+                            decryptedFile.close();
+                            
+                            Serial.println(decrypted);
+                        }
+                    } else {
+                        // 一般文字訊息
+                        String decrypted = AES_Decryption(message);
+                        Serial.println(decrypted);
+                    }
+                }
+                
+                // 清理資源
+                memset(buffer_spase, 0, sizeof(buffer_spase));
+                memset(r_msg, 0, sizeof(r_msg));
+                client.flush();
+            }
+        }
+        client.stop();
+        client.flush();
+        client = WiFiClient();
+    }
+}
+
+void send_msg() {
+    static uint8_t buffer_spase[16];
+    
+    if (Serial.available() > 0) {
+        String message = Serial.readStringUntil('\n');
+        message.trim();
+        if (!message.isEmpty()) {
+            DynamicJsonDocument doc(1024);
+            
+            if (message.endsWith(".txt") || message.indexOf(".img") != -1) {
+                // 處理檔案
+                const char* temp_input = "temp_input.dat";
+                const char* temp_encrypted = "temp_encrypted.dat";
+                
+                // 將原始資料寫入暫存檔
+                File tempFile = SD.open(temp_input, FILE_WRITE);
+                tempFile.print(message);
+                tempFile.close();
+                
+                // 加密檔案
+                encryptFile(temp_input, temp_encrypted);
+                
+                // 讀取加密後的檔案
+                File encryptedFile = SD.open(temp_encrypted, FILE_READ);
+                String encrypted = "";
+                while (encryptedFile.available()) {
+                    encrypted += (char)encryptedFile.read();
+                }
+                encryptedFile.close();
+                
+                // 準備 JSON
+                doc["content_type"] = "file";
+                doc["file_type"] = message.endsWith(".txt") ? "txt" : "img";
+                doc["file_data"] = encrypted;
+            }
+            else {
+                // 一般文字訊息
+                String encrypted = AES_Encryption(message);
+                doc["content_type"] = "message";
+                doc["file_type"] = "text";
+                doc["file_data"] = encrypted;
+            }
+            
+            if (client.connect(WiFi.gatewayIP(), c_ServerPort)) {
+                String jsonString;
+                serializeJson(doc, jsonString);
+                client.println(jsonString);
+                
+                // 清理資源
+                memset(buffer_spase, 0, sizeof(buffer_spase));
+                memset(s_msg, 0, sizeof(s_msg));
+                client.flush();
+                client.stop();
+                client = WiFiClient();
+            }
+            else {
+                Serial.println("Connection to B failed");
+            }
+        }
+    }
+}
+
+
+
+void encryptFile(const char* inputfilename, const char* outputfilename){
+    File inputfile = SD.open(inputfilename, FILE_READ);
+    File outputfile = SD.open(outputfilename, FILE_WRITE);
+
+    if (!inputfile || !outputfile){
+        Serial.println("Failed to open input/output files!");
+        return;
+    }
+
+    uint8_t byte_array[16] = {0};
+    while (inputfile.available()){
+        for (int i = 0; i < 16; i++){
+        if (inputfile.available())
+            byte_array[i] = inputfile.read();
+        else
+            byte_array[i] = 0;
+        }
+
+        // 將 byte array 轉換成 state
+        uint64_t state[4] = {0};
+        for (int i = 0; i < 4; i++){
+        state[i] = (uint64_t)byte_array[i * 4] << 24 |
+                    (uint64_t)byte_array[i * 4 + 1] << 16 |
+                    (uint64_t)byte_array[i * 4 + 2] << 8 |
+                    (uint64_t)byte_array[i * 4 + 3];
+        }
+
+        cipher(state, nr, s_box, w);
+
+        // 將加密後的 state 寫入檔案
+        for (int i = 0; i < 4; i++){
+        for (int j = 0; j < 4; j++) 
+            byte_array[i * 4 + j] = (state[i] >> (24 - j * 8)) & 0xFF;
+        }
+        outputfile.write(byte_array, sizeof(byte_array));
+    }
+
+    inputfile.close();
+    outputfile.close();
+    Serial.println("File encrypted successfully.");
+}
+
+void decryptFile(const char* inputfilename, const char* outputfilename){
+    File inputfile = SD.open(inputfilename, FILE_READ);
+    File outputfile = SD.open(outputfilename, FILE_WRITE);
+
+    if (!inputfile || !outputfile){
+        Serial.println("Failed to open input/output files!");
+        return;
+    }
+
+    uint8_t byte_array[16] = {0};
+    while (inputfile.available()) {
+        // 讀取加密區塊
+        for (int i = 0; i < 16; i++){
+        if (inputfile.available())
+            byte_array[i] = inputfile.read();
+        else
+            byte_array[i] = 0; // 填充0
+        }
+
+        uint64_t state[4] = {0};
+        for (int i = 0; i < 4; i++){
+        state[i] = (uint64_t)byte_array[i * 4] << 24 |
+                    (uint64_t)byte_array[i * 4 + 1] << 16 |
+                    (uint64_t)byte_array[i * 4 + 2] << 8 |
+                    (uint64_t)byte_array[i * 4 + 3];
+        }
+
+    invcipher(state, nr, invs_box, w);
+
+        for (int i = 0; i < 4; i++){
+        for (int j = 0; j < 4; j++)
+            byte_array[i * 4 + j] = (state[i] >> (24 - j * 8)) & 0xFF;
+        }
+        outputfile.write(byte_array, sizeof(byte_array));
+    }
+
+    inputfile.close();
+    outputfile.close();
+    Serial.println("File decrypted successfully.");
+}
 
 void setup() {
     Serial.begin(115200); 
@@ -455,6 +667,13 @@ void setup() {
         delay(1000);
         Serial.println("Connecting to B WiFi...");
     }
+
+    // 初始化 SD 卡
+    if (!SD.begin(chipSelect)){
+        Serial.println("SD card initialization failed!");
+        while (true);
+    }
+    Serial.println("SD card initialized successfully!");
 
     show_wifi_info();
     server.begin();
