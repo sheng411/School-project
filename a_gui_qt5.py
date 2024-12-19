@@ -6,8 +6,9 @@ from PyQt5.QtCore import QThread, Qt, pyqtSignal
 import serial
 import serial.tools.list_ports
 import json
+import base64
 
-# v 8.2
+# v 8.3
 
 '''     環境設定     '''
 title_name = "computer-A"   # 視窗標題
@@ -61,6 +62,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.connect_check=False
         self.username=""
         self.setObjectName("MainWindow")
+
+        # 初始化 chat_content_layout
+        self.chat_content_layout = QtWidgets.QVBoxLayout()
+        self.central_widget = QtWidgets.QWidget()
+        self.central_widget.setLayout(self.chat_content_layout)
+        self.setCentralWidget(self.central_widget)
+
+        # 初始化標誌變數
+        self.is_connected = False
+
         self.setWindowTitle(title_name)
         self.resize(window_size[0], window_size[1])
         self.clear_window()
@@ -423,109 +434,6 @@ class MainWindow(QtWidgets.QMainWindow):
         main_layout.addLayout(port_control)
         main_layout.addLayout(login_layout)
         main_layout.addStretch()
-    '''
-# 文字選單區
-    def text_input_selected(self):
-        self.username = self.name_input.text()
-        clear_window()
-        central_widget = QtWidgets.QWidget(self)
-        self.setCentralWidget(central_widget)
-
-        main_layout = QtWidgets.QHBoxLayout(central_widget)
-        main_layout.setSpacing(20)
-
-        # 左側容器
-        left_container = QtWidgets.QWidget()
-        left_container.setMinimumWidth(int(window_size[0] * 0.6))
-        left_container.setMaximumWidth(int(window_size[0] * 0.75))
-        left_layout = QtWidgets.QVBoxLayout(left_container)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # 建立並保存傳送和接收區域的引用
-        self.send_area = self.create_section_with_return(left_layout, "傳送區", "請輸入內容...")
-        self.receive_area = self.create_section_with_return(left_layout, "接收區", "等待接收...")
-        
-        main_layout.addWidget(left_container)
-        
-        # 右側容器
-        right_container = QtWidgets.QWidget()
-        right_layout = QtWidgets.QVBoxLayout(right_container)
-        right_layout.setContentsMargins(0, 120, 0, 0)  # 調整上方邊距以對齊傳送區
-        
-        # 送出按鈕
-        send_button = QtWidgets.QPushButton("送出")
-        send_button.setFixedSize(150, 60)
-        send_button.setStyleSheet("""
-            QPushButton {
-                border-radius: 30px;
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-                font-size: 16px;
-                font-family: "Microsoft YaHei", "微軟正黑體";  /* 新增字體設定 */
-            }
-            QPushButton:hover {
-                background-color: #008000;
-            }
-        """)
-        send_button.clicked.connect(self.send_message)
-        
-        right_layout.addWidget(send_button, 0, QtCore.Qt.AlignTop)  # 使用 AlignTop 確保按鈕在頂部
-        main_layout.addWidget(right_container)
-
-        # 清除訊息
-        clear_button = QtWidgets.QPushButton("清除")
-        clear_button.setFixedSize(150, 60)
-        clear_button.setStyleSheet("""
-            QPushButton {
-                border-radius: 30px;
-                background-color: #c0c0c0;
-                color: white;
-                border: none;
-                font-size: 16px;
-                font-family: "Microsoft YaHei", "微軟正黑體";  /* 新增字體設定 */
-            }
-            QPushButton:hover {
-                background-color: #808080;
-            }
-        """)
-        clear_button.clicked.connect(self.clear_message)
-        
-        right_layout.addWidget(clear_button, 1, QtCore.Qt.AlignTop)  # 使用 AlignTop 確保按鈕在頂部
-        main_layout.addWidget(right_container)
-
-# 建立區塊並返回文字編輯框的引用
-    def create_section_with_return(self, parent_layout, label_text, placeholder):
-        section_layout = QtWidgets.QVBoxLayout()
-        
-        label = QtWidgets.QLabel(label_text)
-        label.setAlignment(QtCore.Qt.AlignCenter)
-        label.setStyleSheet("""
-            QLabel {
-                font-size: 24px;
-                font-weight: bold;
-                color: #333333;
-                font-family: "Microsoft YaHei", "微軟正黑體";
-            }
-        """)
-        
-        text_edit = QtWidgets.QTextEdit()
-        text_edit.setPlaceholderText(placeholder)
-        text_edit.setStyleSheet("""
-            QTextEdit {
-                border-radius: 10px;
-                border: 2px solid #ccc;
-                padding: 5px;
-                font-size: 16px;
-            }
-        """)
-        
-        section_layout.addWidget(label)
-        section_layout.addWidget(text_edit)
-        parent_layout.addLayout(section_layout)
-        
-        return text_edit
-    '''
 
 # 文字區改版
     def text_input_selected(self):
@@ -669,6 +577,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
 #傳送訊息
     def send_message(self):
+        if not self.is_connected:
+            print(f"未連接到序列埠，無法傳送訊息,{self.is_connected}")
+            return
         try:
             # 準備 JSON 資料
             message_data = {
@@ -717,12 +628,15 @@ class MainWindow(QtWidgets.QMainWindow):
                 elif file_extension in img_type:
                     with open(file_path, 'rb') as file:
                         file_data = file.read()
-                        bytecode=list(file_data)
-                        print(bytecode)
+                        #bytecode=list(file_data)
+                        #print(bytecode)
+
+                        # 將二進制數據轉換為 base64 字串
+                        base64_data = base64.b64encode(file_data).decode('utf-8')
                         message_data.update({
                             "file_type": "img",
                             "file_name": os.path.basename(file_path),
-                            "file_data": bytecode,
+                            "file_data": base64_data,
                             "file_size": len(file_data),
                             "content_type": "file"
                         })
@@ -749,39 +663,50 @@ class MainWindow(QtWidgets.QMainWindow):
             print("Serial port not connected")
 
     def receive_message(self, message):
+        if not self.is_connected:
+            print("未連接到序列埠，無法傳送訊息")
+            return
         try:
+            # 檢查 message 是否為空
+            if not message.strip():
+                raise ValueError("接收到空訊息")
+
             # 解析 JSON 資料
             data = json.loads(message)
             
             # 根據內容類型處理
-            if data["content_type"] == "message":
-                self.show_message(data["file_data"], is_self=False)
+            if data.get("content_type") == "file" and data.get("file_type") == "img":
+                # 將 base64 字串轉回二進位數據
+                img_bytes = base64.b64decode(data["file_data"])
                 
-            elif data["content_type"] == "file":
-                if data["file_type"] == "txt":
-                    self.show_message(f"收到文字檔:\n{data['file_name']}\n\n內容:\n{data['file_data']}", is_self=False)
+                # 建立暫存檔案儲存接收到的圖片
+                temp_path = f"received_{data['file_name']}"
+                with open(temp_path, 'wb') as f:
+                    f.write(img_bytes)
+                
+                # 顯示圖片
+                pixmap = QtGui.QPixmap(temp_path)
+                if not pixmap.isNull():
+                    img_label = QtWidgets.QLabel()
+                    img_label.setPixmap(pixmap.scaled(300, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation))
                     
-                elif data["file_type"] == "img":
-                    img_data = data["file_data"]
-                    temp_path = f"received_{data['file_name']}"
-                    with open(temp_path, 'wb') as f:
-                        f.write(img_data)
+                    message_layout = QtWidgets.QHBoxLayout()
+                    message_layout.addWidget(img_label)
+                    message_layout.addStretch()
                     
-                    pixmap = QtGui.QPixmap(temp_path)
-                    if not pixmap.isNull():
-                        img_label = QtWidgets.QLabel()
-                        img_label.setPixmap(pixmap.scaled(300, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-                        
-                        message_layout = QtWidgets.QHBoxLayout()
-                        message_layout.addWidget(img_label)
-                        message_layout.addStretch()
-                        
+                    if self.chat_content_layout:
                         self.chat_content_layout.addLayout(message_layout)
-                        self.show_message(f"收到圖片: {data['file_name']}", is_self=False)
-                    
+                    self.show_message(f"收到圖片: {data['file_name']}", is_self=False)
+            else:
+                # 處理其他類型的訊息
+                self.show_message(data.get("file_data", message), is_self=False)
+
         except json.JSONDecodeError as e:
             print(f"JSON 解析錯誤: {e}")
-            self.show_message(message, is_self=False)  # 當作普通文字處理
+            print(f"收到的原始訊息: {message}")  # 偵錯用
+            # 當作普通文字處理
+            if self.chat_content_layout:
+                self.show_message(message, is_self=False)
             
         except Exception as e:
             print(f"接收訊息處理錯誤: {e}")
@@ -1008,6 +933,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.port_combo.setEnabled(False)
                 print("我連上的酷東西", selected_port)
                 self.connect_check=True
+                self.is_connected = True
                 print(self.serial_port,serial_baud)
                 #ser = serial.Serial(serial_port, serial_baud)
 
@@ -1030,6 +956,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 """)
             self.port_combo.setEnabled(True)
             self.connect_check=False
+            self.is_connected = False
             print("已斷開序列埠連接")
 
 #清除視窗
@@ -1055,8 +982,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # 將動作加入選單
         input_menu.addAction(home_index_action)
         input_menu.addSeparator()   # 分隔線
-        input_menu.addAction(text_input_action)
-        input_menu.addAction(file_input_action)
+        #input_menu.addAction(text_input_action)
+        #input_menu.addAction(file_input_action)
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
