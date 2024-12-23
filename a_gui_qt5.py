@@ -8,7 +8,7 @@ import serial.tools.list_ports
 import json
 import base64
 
-# v 8.3
+# v 8.4
 
 '''     環境設定     '''
 title_name = "computer-A"   # 視窗標題
@@ -21,6 +21,23 @@ index_name="呱呱呱呱呱" #首頁標題
 img_type=[".png", ".jpg", ".jpeg"]  #圖片格式
 txt_type=".txt"  #文字格式
 
+
+class KeyPressFilter(QtCore.QObject):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent = parent
+
+    def eventFilter(self, obj, event):
+        if event.type() == QtCore.QEvent.KeyPress:
+            if event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
+                if event.modifiers() == QtCore.Qt.ShiftModifier:
+                    # Shift + Enter 換行
+                    obj.textCursor().insertText('\n')
+                else:
+                    # Enter 送出
+                    self.parent.send_message()
+                return True
+        return False
 
 class SerialReaderThread(QThread):
     data_received = pyqtSignal(str)  # 發送訊息到主介面
@@ -62,6 +79,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.connect_check=False
         self.username=""
         self.setObjectName("MainWindow")
+
+        self.login_msg_ck=""
 
         # 初始化 chat_content_layout
         self.chat_content_layout = QtWidgets.QVBoxLayout()
@@ -236,9 +255,8 @@ class MainWindow(QtWidgets.QMainWindow):
             }
         """)
         #self.login_button.setEnabled(False)  # 預設按鈕為禁用
-        self.login_button.clicked.connect(self.text_input_selected)
-        self.login_button.clicked.connect(self.start_listening)
-        
+        self.login_button.clicked.connect(self.login_check)
+
         login_layout.addWidget(name_label)
         login_layout.addWidget(self.name_input)
         login_layout.addWidget(self.login_button)
@@ -421,7 +439,7 @@ class MainWindow(QtWidgets.QMainWindow):
             }
         """)
         #self.login_button.setEnabled(False)  # 預設按鈕為禁用
-        self.login_button.clicked.connect(self.text_input_selected)
+        self.login_button.clicked.connect(self.login_check)
         
         login_layout.addWidget(name_label)
         login_layout.addWidget(self.name_input)
@@ -491,16 +509,19 @@ class MainWindow(QtWidgets.QMainWindow):
         input_layout = QtWidgets.QHBoxLayout()
 
     # 輸入框
-        self.input_field = QtWidgets.QLineEdit(self)
+        self.input_field = QtWidgets.QTextEdit()
+        self.input_field.setFixedHeight(60)  # 設定固定高度
         self.input_field.setPlaceholderText("輸入訊息...")
         self.input_field.setStyleSheet("""
-            QLineEdit {
+            QTextEdit {
                 border: 2px solid #ccc;
                 border-radius: 10px;
                 padding: 5px;
                 font-size: 16px;
             }
         """)
+        self.key_filter = KeyPressFilter(self)
+        self.input_field.installEventFilter(self.key_filter)
 
     # 文件欄位
         self.file_label = QtWidgets.QLabel("未選擇檔案")
@@ -553,8 +574,8 @@ class MainWindow(QtWidgets.QMainWindow):
         """)
 
         input_layout.addWidget(self.input_field)
-        input_layout.addWidget(self.file_label)
-        input_layout.addWidget(browse_button)
+        #input_layout.addWidget(self.file_label)
+        #input_layout.addWidget(browse_button)
         input_layout.addWidget(send_button)
         main_layout.addLayout(input_layout)
         central_widget.setLayout(main_layout)
@@ -576,6 +597,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.file_label.setText(file_name)
 
 #傳送訊息
+    '''
     def send_message(self):
         if not self.is_connected:
             print(f"未連接到序列埠，無法傳送訊息,{self.is_connected}")
@@ -651,8 +673,46 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception as e:
             print(f"傳送錯誤: {e}")
             QtWidgets.QMessageBox.warning(self, "錯誤", f"傳送失敗: {str(e)}")
+    '''
 
-# 接收訊息
+
+    def send_message(self):
+        if not self.is_connected:
+            print(f"未連接到序列埠，無法傳送訊息,{self.is_connected}")
+            return
+        # 送文字訊息
+        message = self.input_field.toPlainText().strip()
+        if message:
+            try:
+                #message+="\n"
+                self.serial_port.write(message.encode('UTF-8'))
+                self.show_message(message, is_self=True)
+                print(f"送出訊息-> {message}")
+                self.input_field.clear()
+            except Exception as e:
+                print(f"Error sending message: {e}")
+        # 送檔案
+        if hasattr(self, 'file_label') and self.file_label.text() != "未選擇檔案":
+            try:
+                file_path = self.file_label.text()
+                # 讀取檔案內容
+                with open(file_path, 'rb') as file:
+                    file_data = file.read()
+                    # 傳送檔案名稱和大小訊息
+                    file_info = f"FILE:{os.path.basename(file_path)}:{len(file_data)}"
+                    self.serial_port.write(file_info.encode('UTF-8') + b'\n')
+                    # 傳送檔案內容
+                    self.serial_port.write(file_data)
+                    # 顯示在聊天視窗
+                    self.show_message(f"已傳送檔案: {os.path.basename(file_path)}", is_self=True)
+                    print(f"檔案傳送成功: {file_path}")
+                    # 清除檔案選擇
+                    self.file_label.setText("未選擇檔案")
+            except Exception as e:
+                print(f"檔案傳送錯誤: {e}")
+                QtWidgets.QMessageBox.warning(self, "錯誤", f"檔案傳送失敗: {str(e)}")
+
+# 開始聆聽序列埠
     def start_listening(self):
         #self.serial_port = self.port_selector.currentText()
         if hasattr(self, 'serial_port') and self.serial_port.is_open:
@@ -662,6 +722,69 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             print("Serial port not connected")
 
+    def start_listening_login(self):
+        #self.serial_port = self.port_selector.currentText()
+        if hasattr(self, 'serial_port') and self.serial_port.is_open:
+            self.serial_thread = SerialReaderThread(self.serial_port)
+            self.serial_thread.data_received.connect(self.remsg_login)
+            self.serial_thread.start()
+        else:
+            print("Serial port not connected")
+    
+    def remsg_login(self, message):
+        self.login_msg_ck=message
+        print(self.login_msg_ck)
+
+# 登入確認
+    def login_check(self):
+        try:
+            # 檢查是否選擇序列埠
+            selected_port = self.port_combo.currentText()
+            if not selected_port or not self.is_connected:
+                QtWidgets.QMessageBox.critical(
+                    self,
+                    "Error",
+                    "請連接序列埠，在重試一次",
+                    QtWidgets.QMessageBox.Ok
+                )
+                return False
+            
+            if not self.name_input.text().strip():
+                QtWidgets.QMessageBox.critical(
+                    self,
+                    "Error",
+                    "請輸入姓名",
+                    QtWidgets.QMessageBox.Ok
+                )
+                return False
+            
+            if self.login_msg_ck != "setup OK":
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    "Warning",
+                    "開發板尚未設定完成",
+                    QtWidgets.QMessageBox.Ok
+                )
+                return False
+
+            # 如果條件都符合，連接按鈕事件
+            self.login_button.clicked.disconnect()  # 先斷開現有連接
+            self.text_input_selected()
+            #self.start_listening()
+            print("登入檢查成功，已啟用聊天功能")
+            return True
+                
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self,
+                "錯誤",
+                f"登入檢查時發生錯誤：{str(e)}",
+                QtWidgets.QMessageBox.Ok
+            )
+            return False
+
+# 接收訊息
+    '''
     def receive_message(self, message):
         if not self.is_connected:
             print("未連接到序列埠，無法傳送訊息")
@@ -674,8 +797,11 @@ class MainWindow(QtWidgets.QMainWindow):
             # 解析 JSON 資料
             data = json.loads(message)
             
+            if data.get("content_type") == "message":
+                self.show_message(data["file_data"], is_self=False)
+
             # 根據內容類型處理
-            if data.get("content_type") == "file" and data.get("file_type") == "img":
+            elif data.get("content_type") == "file" and data.get("file_type") == "img":
                 # 將 base64 字串轉回二進位數據
                 img_bytes = base64.b64decode(data["file_data"])
                 
@@ -711,12 +837,20 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception as e:
             print(f"接收訊息處理錯誤: {e}")
             self.show_message(f"接收訊息錯誤: {str(e)}", is_self=False)
+    '''
+
+    def receive_message(self, message):
+        if not self.is_connected:
+            print("未連接到序列埠，無法傳送訊息")
+            return
+        # 接收到的訊息顯示在左側
+        self.show_message(message, is_self=False)
 
     def create_message_label(self, text, is_self=True):
         # 建立訊息標籤
         message_label = QtWidgets.QLabel(text)
-        message_label.setWordWrap(True)  # 啟用自動換行
-        message_label.setMaximumWidth(500)  # 最大寬度設為500
+        message_label.setWordWrap(False)  # 啟用自動換行
+        message_label.setMaximumWidth(700)  # 最大寬度設為700
         
         # 使用 sizeHint 取得文字實際所需寬度
         label_width = message_label.fontMetrics().boundingRect(text).width() + 40  # 加上padding
@@ -935,6 +1069,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.connect_check=True
                 self.is_connected = True
                 print(self.serial_port,serial_baud)
+                self.start_listening_login()
                 #ser = serial.Serial(serial_port, serial_baud)
 
             except Exception as e:
