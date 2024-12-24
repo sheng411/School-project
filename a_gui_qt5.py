@@ -6,9 +6,8 @@ from PyQt5.QtCore import QThread, Qt, pyqtSignal
 import serial
 import serial.tools.list_ports
 import json
-import base64
 
-# v 8.4
+# v 8.5
 
 '''     環境設定     '''
 title_name = "computer-A"   # 視窗標題
@@ -81,6 +80,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setObjectName("MainWindow")
 
         self.login_msg_ck=""
+        self.login_msg_ck2=False
 
         # 初始化 chat_content_layout
         self.chat_content_layout = QtWidgets.QVBoxLayout()
@@ -90,6 +90,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # 初始化標誌變數
         self.is_connected = False
+        self.is_listening = False
 
         self.setWindowTitle(title_name)
         self.resize(window_size[0], window_size[1])
@@ -723,21 +724,44 @@ class MainWindow(QtWidgets.QMainWindow):
             print("Serial port not connected")
 
     def start_listening_login(self):
-        #self.serial_port = self.port_selector.currentText()
-        if hasattr(self, 'serial_port') and self.serial_port.is_open:
-            self.serial_thread = SerialReaderThread(self.serial_port)
-            self.serial_thread.data_received.connect(self.remsg_login)
-            self.serial_thread.start()
-        else:
-            print("Serial port not connected")
-    
+        try:
+            self.stop_listening()
+            if hasattr(self, 'serial_port') and self.serial_port.is_open:
+                print("開始建立新的監聽線程")
+                self.is_listening = True
+                self.serial_thread1 = SerialReaderThread(self.serial_port)
+                self.serial_thread1.data_received.connect(self.remsg_login)
+                self.serial_thread1.start()
+            else:
+                print("Serial port not connected")
+                self.is_listening = False
+        except Exception as e:
+            print(f"啟動監聽時發生錯誤: {e}")
+            self.is_listening = False
+
+    def stop_listening(self):
+        try:
+            print("準備停止監聽")
+            self.is_listening = False
+            if hasattr(self, 'serial_thread1'):
+                if self.serial_thread1.isRunning():
+                    self.serial_thread1.data_received.disconnect()
+                    self.serial_thread1.quit()
+                    if not self.serial_thread1.wait(200):  # 等待200ms
+                        self.serial_thread1.terminate()  # 強制終止
+                    print("線程已停止")
+                delattr(self, 'serial_thread1')
+        except Exception as e:
+            print(f"停止監聽時發生錯誤: {e}")
+
     def remsg_login(self, message):
         self.login_msg_ck=message
-        print(self.login_msg_ck)
+        print("self.login_msg_ck ",self.login_msg_ck)
 
 # 登入確認
     def login_check(self):
         try:
+            print("self.login_msg_ck-*- ",self.login_msg_ck,"--",self.login_msg_ck2)
             # 檢查是否選擇序列埠
             selected_port = self.port_combo.currentText()
             if not selected_port or not self.is_connected:
@@ -770,7 +794,9 @@ class MainWindow(QtWidgets.QMainWindow):
             # 如果條件都符合，連接按鈕事件
             self.login_button.clicked.disconnect()  # 先斷開現有連接
             self.text_input_selected()
-            #self.start_listening()
+            #self.login_msg_ck2=True
+            self.stop_listening()
+            self.start_listening()
             print("登入檢查成功，已啟用聊天功能")
             return True
                 
