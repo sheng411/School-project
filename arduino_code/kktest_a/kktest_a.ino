@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include "ECC.h"
 #include "AES.h"
-#include "SD.h"
+#include "SD_a.h"
 #define LED_PIN LED_BUILTIN
 uint8_t s_msg[16];
 uint8_t r_msg[16];
@@ -33,6 +33,20 @@ const char* c_SSID = "shESP32";
 const char* c_Password = "987654321";
 const int c_ServerPort = 3559;
 WiFiClient client;
+/*
+//local
+const char* ssid = "shESP32";
+const char* password = "987654321";
+WiFiServer server(3559);
+
+//connect
+const char* c_SSID = "kkESP32";
+const char* c_Password = "987654321";
+const int c_ServerPort = 3559;
+WiFiClient client;
+*/
+
+
 
 void show_wifi_info(){
     Serial.print("connect IP->");
@@ -62,6 +76,7 @@ void check_connect(){
         //show_wifi_info();
         ecc_connect();
         AES_setting();
+        Serial.println("setup OK");
         ck=1;
     }
 }
@@ -367,7 +382,7 @@ String AES_Decryption(String str){
     //Serial.println(decrypted_text);
     return decrypted_text;
 }
-/*
+
 //message receive and send
 void receive_msg(){
     static uint8_t buffer_spase[16];
@@ -415,7 +430,7 @@ void send_msg(){
         message.trim();
         if (!message.isEmpty()) {
             //Serial.println("Sending to B:" + message);
-            Serial.println(message);
+            //Serial.println(message);
             if (client.connect(WiFi.gatewayIP(), c_ServerPort)) {
                 String encrypted = AES_Encryption(message);
                 message.clear();
@@ -439,8 +454,9 @@ void send_msg(){
         }
     }
 }
-*/
+
 /*   測試用   */
+/*
 void receive_msg() {
     static uint8_t buffer_spase[16];
     WiFiClient client = server.available();
@@ -448,6 +464,8 @@ void receive_msg() {
         while (client.connected()) {
             if (client.available()) {
                 String message = client.readStringUntil('\n');
+                Serial.print("re message ");
+                Serial.println(message);
                 
                 // 解析 JSON
                 DynamicJsonDocument doc(1024);
@@ -459,8 +477,9 @@ void receive_msg() {
                     
                     if (strcmp(content_type, "message") == 0) {
                         // 處理一般文字訊息
-                        Serial.print("[Received encrypted message]:\n");
-                        const char* encrypted_data = doc["file_data"];
+                        Serial.println("[Received encrypted message]:");
+                        String encrypted_data = doc["file_data"];
+                        Serial.println(encrypted_data);
                         String decrypted = AES_Decryption(encrypted_data);
                         Serial.println(decrypted);
                     }
@@ -506,14 +525,13 @@ void receive_msg() {
 
 void send_msg() {
     static uint8_t buffer_spase[16];
-    
     if (Serial.available() > 0) {
         String message = Serial.readStringUntil('\n');
         message.trim();
         if (!message.isEmpty()) {
             DynamicJsonDocument doc(1024);
             DeserializationError error = deserializeJson(doc, message);
-            
+            Serial.println("1");
             if (error) {
                 Serial.println("JSON parsing failed!");
                 Serial.println(error.f_str());
@@ -522,14 +540,19 @@ void send_msg() {
 
             // 判斷 content_type
             const char* content_type = doc["content_type"];
+            Serial.println("2");
 
             if (strcmp(content_type, "message") == 0) {
                 // 處理一般文字訊息
                 const char* file_data = doc["file_data"];
+                Serial.print("file_data");
+                Serial.println(file_data);
                 String encrypted = AES_Encryption(file_data);
+                Serial.print("encrypted");
+                Serial.println(encrypted);
 
                 // 準備新的 JSON 發送
-                DynamicJsonDocument output_doc(512);
+                DynamicJsonDocument output_doc(1024);
                 output_doc["content_type"] = "message";
                 output_doc["file_type"] = "text";
                 output_doc["file_data"] = encrypted;
@@ -537,6 +560,8 @@ void send_msg() {
                 if (client.connect(WiFi.gatewayIP(), c_ServerPort)) {
                     String jsonString;
                     serializeJson(output_doc, jsonString);
+                    Serial.print("jsonString ");
+                    Serial.println(jsonString);
                     client.println(jsonString);
                     client.flush();
                     client.stop();
@@ -566,7 +591,7 @@ void send_msg() {
         }
     }
 }
-
+*/
 
 void setup() {
     Serial.begin(115200); 
@@ -590,13 +615,13 @@ void setup() {
     }
 
     // 初始化 SD 卡
-    if (!SD.begin(chipSelect)){
+    /*if (!SD.begin(chipSelect)){
         Serial.println("SD card initialization failed!");
         while (1);
-    }
+    }*/
     Serial.println("SD card initialized successfully!");
 
-    show_wifi_info();
+    //show_wifi_info();
     server.begin();
     ecc_connect();
     AES_setting();
