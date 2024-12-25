@@ -194,6 +194,11 @@ String readFileToJson(const char *filename) {
     //jsonDoc["file_size"] = fileContent.length(); // 設定檔案大小
     jsonDoc["file_data"] = fileContent;       // 設定檔案內容
 
+    Serial.print("[[txt]file name]:");
+    Serial.println(filename);
+    Serial.print("[[txt]file data]:");
+    Serial.println(fileContent);
+
     // 將 JSON 資料轉換為字串
     String jsonString;
     serializeJson(jsonDoc, jsonString);
