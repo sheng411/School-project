@@ -7,7 +7,7 @@ import serial
 import serial.tools.list_ports
 import json
 
-# v 8.6.1
+# v 8.6.2
 
 '''     環境設定     '''
 title_name = "computer-A"   # 視窗標題
@@ -714,15 +714,15 @@ class MainWindow(QtWidgets.QMainWindow):
                     content = file.read()
                     data = {
                         'file_type': 'txt',
-                        "file_name": os.path.basename(self.selected_file_path),
+                        "file_name": os.path.basename(self.current_file_path),
                         'file_data': content,
                         'content_type': 'file'
                     }
                     json_data = json.dumps(data, ensure_ascii=False)
                     if self.serial_port and self.serial_port.is_open:
                         self.serial_port.write(json_data.encode())
-                        print(f"已發送檔案: {self.selected_file_path}")
-                        delattr(self, 'selected_file_path')
+                        print(f"已發送檔案: {self.current_file_path}")
+                        delattr(self, 'current_file_path')
                         self.file_label.clear()
             else:
                 print("未選擇檔案")
