@@ -7,7 +7,7 @@ import serial
 import serial.tools.list_ports
 import json
 
-# v 8.6.2
+# v 8.6.3
 
 '''     環境設定     '''
 title_name = "computer-A"   # 視窗標題
@@ -584,6 +584,9 @@ class MainWindow(QtWidgets.QMainWindow):
     # 設定布局的邊距和間距
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
+    # 更新訊息後自動捲動到底部
+        scrollbar = self.chat_area.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
 
 #選擇檔案
     def open_file_dialog(self):
@@ -798,7 +801,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 )
                 return False
             
-            if self.login_msg_ck != "setup OK":
+            if self.login_msg_ck != "setup OK" or self.login_msg_ck2==True:
                 QtWidgets.QMessageBox.warning(
                     self,
                     "Warning",
@@ -810,7 +813,7 @@ class MainWindow(QtWidgets.QMainWindow):
             # 如果條件都符合，連接按鈕事件
             self.login_button.clicked.disconnect()  # 先斷開現有連接
             self.text_input_selected()
-            #self.login_msg_ck2=True
+            self.login_msg_ck2=True
             self.stop_listening()
             self.start_listening()
             print("登入檢查成功，已啟用聊天功能")
@@ -1176,6 +1179,19 @@ class MainWindow(QtWidgets.QMainWindow):
             self.is_connected = False
             print("已斷開序列埠連接")
 
+    def login_again(self):
+        ck=QtWidgets.QMessageBox.question(
+            self,
+            "Login Check",
+            "裝置是否已經互相連線?",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+            QtWidgets.QMessageBox.No
+        )
+        if ck==QtWidgets.QMessageBox.Yes:
+            self.login_msg_ck2 = True
+        else:
+            self.login_msg_ck2 = False
+
 #清除視窗
     def clear_window(self):
         self.setStyleSheet("")
@@ -1188,6 +1204,10 @@ class MainWindow(QtWidgets.QMainWindow):
         home_index_action = QtWidgets.QAction('回首頁', self)
         home_index_action.triggered.connect(self.home_index_selected)
 
+        # 重新登入
+        login_again_action = QtWidgets.QAction('登入確認', self)
+        login_again_action.triggered.connect(self.login_again)
+
         # 文字輸入
         text_input_action = QtWidgets.QAction('文字輸入', self)
         text_input_action.triggered.connect(self.text_input_selected)
@@ -1197,8 +1217,9 @@ class MainWindow(QtWidgets.QMainWindow):
         file_input_action.triggered.connect(self.file_input_selected)
         
         # 將動作加入選單
-        input_menu.addAction(home_index_action)
+        input_menu.addAction(login_again_action)
         input_menu.addSeparator()   # 分隔線
+        input_menu.addAction(home_index_action)
         #input_menu.addAction(text_input_action)
         #input_menu.addAction(file_input_action)
 
