@@ -41,12 +41,12 @@ String writeFileFromJson(const char *jsonString){
     }
 
     // 寫入文件內容並檢查結果
-    if (file.print(fileData) == 0)
+    /*if (file.print(fileData) == 0)
         //Serial.println("Failed to write data to file!");
     else{
-        //Serial.print("Data written to file successfully! File: ");
-        //Serial.println(fullFileName);
-    }
+        Serial.print("Data written to file successfully! File: ");
+        Serial.println(fullFileName);
+    }*/
 
     file.close();
 
@@ -57,6 +57,7 @@ String writeFileFromJson(const char *jsonString){
 
 
 //顯示檔案內容(input file)
+/*
 void readFile(const char* filename){
     File file = SD.open(filename, FILE_READ);
     if (!file){
@@ -76,7 +77,7 @@ void readFile(const char* filename){
     file.close();
     Serial.println("\nDone successfully.");
 }
-
+*/
 
 // 加密檔案(input file/output file)
 void encryptFile(const char* inputfilename, const char* outputfilename){

@@ -384,7 +384,8 @@ String AES_Decryption(String str){
 }
 
 
-//message receive and send
+/*   receive  */
+/*
 void receive_msg(){
     static uint8_t buffer_spase[16];
     //a to b
@@ -421,42 +422,6 @@ void receive_msg(){
         //Serial.println("Client disconnected");
     }
 }
-
-void send_msg(){
-    //a to b
-    static uint8_t buffer_spase[16];
-    
-    if (Serial.available() > 0) {
-        String message = Serial.readStringUntil('\n');
-        message.trim();
-        if (!message.isEmpty()) {
-            //Serial.println("Sending to B:" + message);
-            //Serial.println(message);
-            if (client.connect(WiFi.gatewayIP(), c_ServerPort)) {
-                String encrypted = AES_Encryption(message);
-                message.clear();
-                
-                client.println(encrypted);
-                // 清理加密後的訊息
-                encrypted.clear();
-                
-                // 清理緩衝區
-                memset(buffer_spase, 0, sizeof(buffer_spase));
-                memset(s_msg, 0, sizeof(s_msg));
-
-                // clear the message buffer
-                client.flush();
-                client.stop();
-                client = WiFiClient();
-            }
-            else {
-                Serial.println("Connection to B failed");
-            }
-        }
-    }
-}
-
-/*   測試用   */
 
 void receive_msg_txt() {
     static uint8_t buffer_spase[16];
@@ -508,6 +473,101 @@ void receive_msg_txt() {
         client = WiFiClient();
     }
 }
+*/
+
+void receive_msg(String message){
+    static uint8_t buffer_spase[16];
+
+    Serial.print("[receive encrypted message]:\n");
+    Serial.println(message);
+
+    // 解密後清理原始訊息
+    String decrypted = AES_Decryption(message);
+    message.clear();
+    Serial.println(decrypted);
+    
+    // 清理解密後的訊息和緩衝區
+    decrypted.clear();
+    memset(buffer_spase, 0, sizeof(buffer_spase));
+    memset(r_msg, 0, sizeof(r_msg));
+
+    // clear the message buffer
+    message = "";
+}
+
+
+
+void receive_msg_txt(String message) {
+    static uint8_t buffer_spase[16];
+    
+    // 解析 JSON
+    StaticJsonDocument<256> doc;
+    DeserializationError error = deserializeJson(doc, message);
+    
+    if (!error) {
+        const char* file_name = doc["file_name"];
+        const char* file_data = doc["file_data"];
+        Serial.println(file_name);
+        Serial.println(file_data);
+        Serial.println("02");
+        
+        if (file_name != nullptr && file_data != nullptr) {
+            // 僅處理 .txt 檔案
+            writeFileFromJson(message.c_str());
+            decryptFile("/encrypted.txt", "/decrypted.txt");
+            String jsonString = readFileToJson("/decrypted.txt");
+        }
+        else {
+            Serial.println("JSON缺少必要欄位");
+        }
+    }
+    else {
+        Serial.print("JSON Parse Error: ");
+        Serial.println(error.c_str());
+    }
+    // 清理資源
+    memset(buffer_spase, 0, sizeof(buffer_spase));
+    memset(r_msg, 0, sizeof(r_msg));
+    message = "";
+}
+
+
+/*   Send  */
+
+void send_msg(){
+    //a to b
+    static uint8_t buffer_spase[16];
+    
+    if (Serial.available() > 0) {
+        String message = Serial.readStringUntil('\n');
+        message.trim();
+        if (!message.isEmpty()) {
+            //Serial.println("Sending to B:" + message);
+            //Serial.println(message);
+            if (client.connect(WiFi.gatewayIP(), c_ServerPort)) {
+                String encrypted = AES_Encryption(message);
+                message.clear();
+                
+                client.println(encrypted);
+                // 清理加密後的訊息
+                encrypted.clear();
+                
+                // 清理緩衝區
+                memset(buffer_spase, 0, sizeof(buffer_spase));
+                memset(s_msg, 0, sizeof(s_msg));
+
+                // clear the message buffer
+                client.flush();
+                client.stop();
+                client = WiFiClient();
+            }
+            else {
+                Serial.println("Connection to B failed");
+            }
+        }
+    }
+}
+
 
 void send_msg_txt() {
     static uint8_t buffer_spase[16];
@@ -550,28 +610,46 @@ void send_msg_txt() {
     }
 }
 
-/*
-void check_and_receive_message(String message) {
-    DynamicJsonDocument doc(1024);
-    DeserializationError error = deserializeJson(doc, message);
+/**/
+void check_receive_message() {
+    static uint8_t buffer_spase[16];
+    WiFiClient client = server.available();
+    if (client) {
+        while (client.connected()) {
+            if (client.available()) {
+                String message = client.readStringUntil('\n');
+                
+                StaticJsonDocument<256> doc;
+                doc.clear();  // 清除舊資料
+                DeserializationError error = deserializeJson(doc, message);
 
-    if (!error) {
-        // 成功解析JSON
-        if (doc.containsKey("content_type") && doc["content_type"] == "file") {
-        // 如果是檔案類型的JSON
-        receive_msg_txt(message);
+                if (!error) {
+                    // 成功解析JSON
+                    if (doc.containsKey("file_type") && doc["file_type"] == "txt") {
+                        // 如果是檔案類型的JSON
+                        receive_msg_txt(message);
+                    }
+                    else{
+                        // 一般JSON訊息
+                        receive_msg(message);
+                    }
+                }
+                else{
+                    // 不是JSON格式
+                    receive_msg(message);
+                }
+
+                memset(buffer_spase, 0, sizeof(buffer_spase));
+                memset(r_msg, 0, sizeof(r_msg));
+                client.flush();
+            }
         }
-        else{
-        // 一般JSON訊息
-        receive_msg(message);
-        }
-    }
-    else{
-        // 不是JSON格式
-        receive_msg(message);
+        client.stop();
+        client.flush();
+        client = WiFiClient();
     }
 }
-*/
+
 
 void setup() {
     Serial.begin(115200); 
@@ -613,12 +691,11 @@ void setup() {
 
 void loop() {
     check_connect();
-    /*receive_msg();
-    delay(10);
+
     send_msg();    
-    delay(10);*/
-    receive_msg_txt();
     delay(10);
     send_msg_txt();
+    delay(10);
+    check_receive_message();
     delay(10);
 }
