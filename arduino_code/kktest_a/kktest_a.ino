@@ -383,6 +383,28 @@ String AES_Decryption(String str){
     return decrypted_text;
 }
 
+
+void check_and_receive_message(String message) {
+    DynamicJsonDocument doc(1024);
+    DeserializationError error = deserializeJson(doc, message);
+
+    if (!error) {
+        // 成功解析JSON
+        if (doc.containsKey("type") && doc["type"] == "file") {
+        // 如果是檔案類型的JSON
+        receive_msg_txt(message);
+        }
+        else{
+        // 一般JSON訊息
+        receive_msg(message);
+        }
+    }
+    else{
+        // 不是JSON格式
+        receive_msg(message);
+    }
+}
+
 //message receive and send
 void receive_msg(){
     static uint8_t buffer_spase[16];
@@ -456,8 +478,8 @@ void send_msg(){
 }
 
 /*   測試用   */
-/*
-void receive_msg() {
+
+void receive_msg_txt() {
     static uint8_t buffer_spase[16];
     WiFiClient client = server.available();
     if (client) {
@@ -468,42 +490,32 @@ void receive_msg() {
                 Serial.println(message);
                 
                 // 解析 JSON
-                DynamicJsonDocument doc(1024);
+                DynamicJsonDocument doc(256);
                 DeserializationError error = deserializeJson(doc, message);
                 
                 if (!error) {
                     const char* content_type = doc["content_type"];
                     const char* file_type = doc["file_type"];
                     
-                    if (strcmp(content_type, "message") == 0) {
-                        // 處理一般文字訊息
-                        Serial.println("[Received encrypted message]:");
-                        String encrypted_data = doc["file_data"];
-                        Serial.println(encrypted_data);
-                        String decrypted = AES_Decryption(encrypted_data);
-                        Serial.println(decrypted);
+                    if (strcmp(content_type, "file") == 0 && strcmp(file_type, "txt") == 0) {
+                        // 僅處理 .txt 檔案
+                        writeFileFromJson(message.c_str());
+                        decryptFile("/encrypted.txt", "/decrypted.txt");
+                        String jsonString = readFileToJson("/decrypted.txt");
+                        Serial.println("[receive encrypted message]:");
+                        // 解析回傳的 JSON
+                        StaticJsonDocument<256> resultDoc;
+                        DeserializationError jsonError = deserializeJson(resultDoc, jsonString);
+                        
+                        if (!jsonError) {
+                        Serial.println(resultDoc["file_data"].as<const char*>());
+                        }
+                        else {
+                            Serial.println("Error parsing decrypted file JSON");
+                        }
                     }
-                    else if (strcmp(content_type, "file") == 0) {
-                        if (strcmp(file_type, "txt") == 0) {
-                            writeFileFromJson(message.c_str());
-                            decryptFile("/encrypted.txt", "/decrypted.txt");
-                            String jsonString = readFileToJson("/decrypted.txt");
-                            
-                            Serial.println("[receive encrypted message]:");
-                            // 解析回傳的 JSON
-                            StaticJsonDocument<1024> resultDoc;
-                            DeserializationError jsonError = deserializeJson(resultDoc, jsonString);
-                            
-                            if (!jsonError) {
-                                Serial.println(resultDoc["file_data"].as<const char*>());
-                            }
-                            else{
-                                Serial.println("Error parsing decrypted file JSON");
-                            }
-                        }
-                        else if(strcmp(file_type, "img") == 0){
-                            
-                        }
+                    else {
+                        Serial.println("Unsupported content_type or file_type.");
                     }
                 }
                 else {
@@ -522,14 +534,14 @@ void receive_msg() {
         client = WiFiClient();
     }
 }
-
-void send_msg() {
+/**/
+void send_msg_txt() {
     static uint8_t buffer_spase[16];
     if (Serial.available() > 0) {
         String message = Serial.readStringUntil('\n');
         message.trim();
         if (!message.isEmpty()) {
-            DynamicJsonDocument doc(1024);
+            DynamicJsonDocument doc(256);
             DeserializationError error = deserializeJson(doc, message);
             Serial.println("1");
             if (error) {
@@ -542,35 +554,7 @@ void send_msg() {
             const char* content_type = doc["content_type"];
             Serial.println("2");
 
-            if (strcmp(content_type, "message") == 0) {
-                // 處理一般文字訊息
-                const char* file_data = doc["file_data"];
-                Serial.print("file_data");
-                Serial.println(file_data);
-                String encrypted = AES_Encryption(file_data);
-                Serial.print("encrypted");
-                Serial.println(encrypted);
-
-                // 準備新的 JSON 發送
-                DynamicJsonDocument output_doc(1024);
-                output_doc["content_type"] = "message";
-                output_doc["file_type"] = "text";
-                output_doc["file_data"] = encrypted;
-
-                if (client.connect(WiFi.gatewayIP(), c_ServerPort)) {
-                    String jsonString;
-                    serializeJson(output_doc, jsonString);
-                    Serial.print("jsonString ");
-                    Serial.println(jsonString);
-                    client.println(jsonString);
-                    client.flush();
-                    client.stop();
-                }
-                else {
-                    Serial.println("Connection to B failed");
-                }
-            }
-            else if (strcmp(content_type, "file") == 0 && strcmp(doc["file_type"], "txt") == 0) {
+            if (strcmp(content_type, "file") == 0 && strcmp(doc["file_type"], "txt") == 0) {
                 // 處理 .txt 檔案，直接存儲 JSON 字串
                 String inputFile = writeFileFromJson(message.c_str());
                 encryptFile(inputFile.c_str(), "/encrypted.txt");
@@ -591,7 +575,7 @@ void send_msg() {
         }
     }
 }
-*/
+
 
 void setup() {
     Serial.begin(115200); 
@@ -630,8 +614,12 @@ void setup() {
 
 void loop() {
     check_connect();
-    receive_msg();
+    /*receive_msg();
     delay(10);
     send_msg();    
+    delay(10);*/
+    receive_msg_txt();
+    delay(10);
+    send_msg_txt();
     delay(10);
 }
