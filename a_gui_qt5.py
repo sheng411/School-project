@@ -7,7 +7,7 @@ import serial
 import serial.tools.list_ports
 import json
 
-# v 8.6
+# v 8.6.1
 
 '''     環境設定     '''
 title_name = "computer-A"   # 視窗標題
@@ -541,7 +541,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # 瀏覽按鈕
         browse_button = QtWidgets.QPushButton("瀏覽")
         browse_button.setFixedSize(100, 40)
-        browse_button.clicked.connect(self.select_file)
+        browse_button.clicked.connect(self.open_file_dialog)
         browse_button.setStyleSheet("""
             QPushButton {
                 border-radius: 17px;
@@ -685,7 +685,7 @@ class MainWindow(QtWidgets.QMainWindow):
         return False
 
     def on_send_clicked(self):
-        if hasattr(self, 'selected_file_path'):
+        if hasattr(self, 'current_file_path'):
             self.send_message_file()
         else:
             # 原有的發送訊息邏輯
@@ -709,8 +709,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def send_message_file(self):
         try:
-            if hasattr(self, 'selected_file_path'):
-                with open(self.selected_file_path, 'r', encoding='utf-8') as file:
+            if hasattr(self, 'current_file_path'):
+                with open(self.current_file_path, 'r', encoding='utf-8') as file:
                     content = file.read()
                     data = {
                         'file_type': 'txt',
@@ -723,7 +723,7 @@ class MainWindow(QtWidgets.QMainWindow):
                         self.serial_port.write(json_data.encode())
                         print(f"已發送檔案: {self.selected_file_path}")
                         delattr(self, 'selected_file_path')
-                        self.message_input.clear()
+                        self.file_label.clear()
             else:
                 print("未選擇檔案")
         except Exception as e:
