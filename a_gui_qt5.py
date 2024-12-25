@@ -7,7 +7,7 @@ import serial
 import serial.tools.list_ports
 import json
 
-# v 8.5
+# v 8.6
 
 '''     環境設定     '''
 title_name = "computer-A"   # 視窗標題
@@ -541,7 +541,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # 瀏覽按鈕
         browse_button = QtWidgets.QPushButton("瀏覽")
         browse_button.setFixedSize(100, 40)
-        browse_button.clicked.connect(self.open_file_dialog)
+        browse_button.clicked.connect(self.select_file)
         browse_button.setStyleSheet("""
             QPushButton {
                 border-radius: 17px;
@@ -559,7 +559,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # 傳送按鈕
         send_button = QtWidgets.QPushButton("傳送")
         send_button.setFixedSize(100, 40)
-        send_button.clicked.connect(self.send_message)
+        send_button.clicked.connect(self.on_send_clicked)
         send_button.setStyleSheet("""
             QPushButton {
                 border-radius: 17px;
@@ -575,8 +575,8 @@ class MainWindow(QtWidgets.QMainWindow):
         """)
 
         input_layout.addWidget(self.input_field)
-        #input_layout.addWidget(self.file_label)
-        #input_layout.addWidget(browse_button)
+        input_layout.addWidget(self.file_label)
+        input_layout.addWidget(browse_button)
         input_layout.addWidget(send_button)
         main_layout.addLayout(input_layout)
         central_widget.setLayout(main_layout)
@@ -588,7 +588,7 @@ class MainWindow(QtWidgets.QMainWindow):
 #選擇檔案
     def open_file_dialog(self):
         options = QtWidgets.QFileDialog.Options()
-        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "選擇文件", "", "All Files (*);;Text Files (*.txt)", options=options)
+        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "選擇文件", "", "Text Files (*.txt)", options=options)
         if file_path:
             self.on_file_selected(file_path)
 
@@ -676,6 +676,20 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.warning(self, "錯誤", f"傳送失敗: {str(e)}")
     '''
 
+    def select_file(self):
+        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "選擇檔案", "", "Text Files (*.txt)")
+        if file_path:
+            self.selected_file_path = file_path
+            self.message_input.setText(f"已選擇檔案: {os.path.basename(file_path)}")
+            return True
+        return False
+
+    def on_send_clicked(self):
+        if hasattr(self, 'selected_file_path'):
+            self.send_message_file()
+        else:
+            # 原有的發送訊息邏輯
+            self.send_message() 
 
     def send_message(self):
         if not self.is_connected:
@@ -692,33 +706,35 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.input_field.clear()
             except Exception as e:
                 print(f"Error sending message: {e}")
-        # 送檔案
-        if hasattr(self, 'file_label') and self.file_label.text() != "未選擇檔案":
-            try:
-                file_path = self.file_label.text()
-                # 讀取檔案內容
-                with open(file_path, 'rb') as file:
-                    file_data = file.read()
-                    # 傳送檔案名稱和大小訊息
-                    file_info = f"FILE:{os.path.basename(file_path)}:{len(file_data)}"
-                    self.serial_port.write(file_info.encode('UTF-8') + b'\n')
-                    # 傳送檔案內容
-                    self.serial_port.write(file_data)
-                    # 顯示在聊天視窗
-                    self.show_message(f"已傳送檔案: {os.path.basename(file_path)}", is_self=True)
-                    print(f"檔案傳送成功: {file_path}")
-                    # 清除檔案選擇
-                    self.file_label.setText("未選擇檔案")
-            except Exception as e:
-                print(f"檔案傳送錯誤: {e}")
-                QtWidgets.QMessageBox.warning(self, "錯誤", f"檔案傳送失敗: {str(e)}")
+
+    def send_message_file(self):
+        try:
+            if hasattr(self, 'selected_file_path'):
+                with open(self.selected_file_path, 'r', encoding='utf-8') as file:
+                    content = file.read()
+                    data = {
+                        'file_type': 'txt',
+                        "file_name": os.path.basename(self.selected_file_path),
+                        'file_data': content,
+                        'content_type': 'file'
+                    }
+                    json_data = json.dumps(data, ensure_ascii=False)
+                    if self.serial_port and self.serial_port.is_open:
+                        self.serial_port.write(json_data.encode())
+                        print(f"已發送檔案: {self.selected_file_path}")
+                        delattr(self, 'selected_file_path')
+                        self.message_input.clear()
+            else:
+                print("未選擇檔案")
+        except Exception as e:
+            print(f"發送檔案時發生錯誤: {e}")
 
 # 開始聆聽序列埠
     def start_listening(self):
         #self.serial_port = self.port_selector.currentText()
         if hasattr(self, 'serial_port') and self.serial_port.is_open:
             self.serial_thread = SerialReaderThread(self.serial_port)
-            self.serial_thread.data_received.connect(self.receive_message)
+            self.serial_thread.data_received.connect(self.check_and_receive_message)
             self.serial_thread.start()
         else:
             print("Serial port not connected")
@@ -865,12 +881,52 @@ class MainWindow(QtWidgets.QMainWindow):
             self.show_message(f"接收訊息錯誤: {str(e)}", is_self=False)
     '''
 
+    def check_and_receive_message(self, message):
+        try:
+            # 嘗試解析JSON
+            json_data = json.loads(message)
+            
+            # 如果成功解析且是檔案類型
+            if isinstance(json_data, dict) and json_data.get('content_type') == 'file':
+                self.receive_message_file(message)
+
+        except json.JSONDecodeError:
+            # 非JSON格式，使用一般訊息處理
+            self.receive_message(message)
+        except Exception as e:
+            print(f"訊息處理錯誤: {e}")
+            self.receive_message(message)
+
     def receive_message(self, message):
         if not self.is_connected:
             print("未連接到序列埠，無法傳送訊息")
             return
         # 接收到的訊息顯示在左側
         self.show_message(message, is_self=False)
+
+    def receive_message_file(self, message):
+        try:
+            # 解析JSON資料
+            data = json.loads(message)
+            
+            # 檢查是否為文件類型
+            if data.get('file_type') == 'txt':
+                content = data.get('content')
+                filename = data.get('filename')
+                
+                # 儲存接收到的文件
+                save_path = f"received_{filename}"
+                #with open(save_path, 'w', encoding='utf-8') as f:
+                #    f.write(content)
+                
+                # 顯示接收訊息
+                self.show_message(f"[收到文件:] {filename} \n[內容:]\n{content}", is_self=False)
+                print(f"文件已儲存至: {save_path}")
+                
+        except json.JSONDecodeError as e:
+            print(f"JSON解析錯誤: {e}")
+        except Exception as e:
+            print(f"接收文件時發生錯誤: {e}")
 
     def create_message_label(self, text, is_self=True):
         # 建立訊息標籤
