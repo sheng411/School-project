@@ -22,7 +22,7 @@ int current_byte_count = 0;  // 當前區塊中的總字節數
 //SD 接腳
 const int chipSelect = 5;
 using namespace std;
-
+/*
 //local
 const char* ssid = "kkESP32";
 const char* password = "987654321";
@@ -33,18 +33,18 @@ const char* c_SSID = "shESP32";
 const char* c_Password = "987654321";
 const int c_ServerPort = 3559;
 WiFiClient client;
-/*
+*/
 //local
 const char* ssid = "shESP32";
-const char* password = "987654321";
+const char* password = "123456789";
 WiFiServer server(3559);
 
 //connect
 const char* c_SSID = "kkESP32";
-const char* c_Password = "987654321";
+const char* c_Password = "123456789";
 const int c_ServerPort = 3559;
 WiFiClient client;
-*/
+
 
 
 
@@ -384,27 +384,6 @@ String AES_Decryption(String str){
 }
 
 
-void check_and_receive_message(String message) {
-    DynamicJsonDocument doc(1024);
-    DeserializationError error = deserializeJson(doc, message);
-
-    if (!error) {
-        // 成功解析JSON
-        if (doc.containsKey("type") && doc["type"] == "file") {
-        // 如果是檔案類型的JSON
-        receive_msg_txt(message);
-        }
-        else{
-        // 一般JSON訊息
-        receive_msg(message);
-        }
-    }
-    else{
-        // 不是JSON格式
-        receive_msg(message);
-    }
-}
-
 //message receive and send
 void receive_msg(){
     static uint8_t buffer_spase[16];
@@ -488,34 +467,29 @@ void receive_msg_txt() {
                 String message = client.readStringUntil('\n');
                 Serial.print("re message ");
                 Serial.println(message);
+
+                Serial.println("00");
                 
                 // 解析 JSON
-                DynamicJsonDocument doc(256);
+                StaticJsonDocument<256> doc;
                 DeserializationError error = deserializeJson(doc, message);
+                Serial.println("01");
                 
                 if (!error) {
-                    const char* content_type = doc["content_type"];
-                    const char* file_type = doc["file_type"];
+                    const char* file_name = doc["file_name"];
+                    const char* file_data = doc["file_data"];
+                    Serial.println(file_name);
+                    Serial.println(file_data);
+                    Serial.println("02");
                     
-                    if (strcmp(content_type, "file") == 0 && strcmp(file_type, "txt") == 0) {
+                    if (file_name != nullptr && file_data != nullptr) {
                         // 僅處理 .txt 檔案
                         writeFileFromJson(message.c_str());
                         decryptFile("/encrypted.txt", "/decrypted.txt");
                         String jsonString = readFileToJson("/decrypted.txt");
-                        Serial.println("[receive encrypted message]:");
-                        // 解析回傳的 JSON
-                        StaticJsonDocument<256> resultDoc;
-                        DeserializationError jsonError = deserializeJson(resultDoc, jsonString);
-                        
-                        if (!jsonError) {
-                        Serial.println(resultDoc["file_data"].as<const char*>());
-                        }
-                        else {
-                            Serial.println("Error parsing decrypted file JSON");
-                        }
                     }
                     else {
-                        Serial.println("Unsupported content_type or file_type.");
+                        Serial.println("JSON缺少必要欄位");
                     }
                 }
                 else {
@@ -534,7 +508,7 @@ void receive_msg_txt() {
         client = WiFiClient();
     }
 }
-/**/
+
 void send_msg_txt() {
     static uint8_t buffer_spase[16];
     if (Serial.available() > 0) {
@@ -576,6 +550,28 @@ void send_msg_txt() {
     }
 }
 
+/*
+void check_and_receive_message(String message) {
+    DynamicJsonDocument doc(1024);
+    DeserializationError error = deserializeJson(doc, message);
+
+    if (!error) {
+        // 成功解析JSON
+        if (doc.containsKey("content_type") && doc["content_type"] == "file") {
+        // 如果是檔案類型的JSON
+        receive_msg_txt(message);
+        }
+        else{
+        // 一般JSON訊息
+        receive_msg(message);
+        }
+    }
+    else{
+        // 不是JSON格式
+        receive_msg(message);
+    }
+}
+*/
 
 void setup() {
     Serial.begin(115200); 
@@ -598,11 +594,14 @@ void setup() {
         Serial.println("Connecting to B WiFi...");
     }
 
+    Serial.println(ssid);
+    Serial.println(password);
+
     // 初始化 SD 卡
-    /*if (!SD.begin(chipSelect)){
+    if (!SD.begin(chipSelect)){
         Serial.println("SD card initialization failed!");
         while (1);
-    }*/
+    }
     Serial.println("SD card initialized successfully!");
 
     //show_wifi_info();
