@@ -16,8 +16,8 @@ String writeFileFromJson(const char *jsonString){
     // 解析 JSON 字串
     DeserializationError error = deserializeJson(jsonDoc, jsonString);
     if (error){
-        Serial.print("Failed to parse JSON: ");
-        Serial.println(error.f_str());
+        //Serial.print("Failed to parse JSON: ");
+        //Serial.println(error.f_str());
         return String("");
     }
 
@@ -27,7 +27,7 @@ String writeFileFromJson(const char *jsonString){
 
     // 確保文件名稱正確，避免空值或格式錯誤
     if (!fileName || !fileData){
-        Serial.println("Invalid JSON data: Missing file_name or file_data!");
+        //Serial.println("Invalid JSON data: Missing file_name or file_data!");
         return String("");
     }
 
@@ -36,16 +36,16 @@ String writeFileFromJson(const char *jsonString){
     // 打開 SD 卡文件進行寫入
     File file = SD.open(fullFileName.c_str(), FILE_WRITE);
     if (!file){
-        Serial.println("Failed to open file for writing!");
+        //Serial.println("Failed to open file for writing!");
         return String("");
     }
 
     // 寫入文件內容並檢查結果
     if (file.print(fileData) == 0)
-        Serial.println("Failed to write data to file!");
+        //Serial.println("Failed to write data to file!");
     else{
-        Serial.print("Data written to file successfully! File: ");
-        Serial.println(fullFileName);
+        //Serial.print("Data written to file successfully! File: ");
+        //Serial.println(fullFileName);
     }
 
     file.close();
@@ -84,7 +84,7 @@ void encryptFile(const char* inputfilename, const char* outputfilename){
     File outputfile = SD.open(outputfilename, FILE_WRITE);
 
     if (!inputfile || !outputfile){
-        Serial.println("Failed to open input/output files!");
+        //Serial.println("Failed to open input/output files!");
         return;
     }
 
@@ -118,7 +118,7 @@ void encryptFile(const char* inputfilename, const char* outputfilename){
 
     inputfile.close();
     outputfile.close();
-    Serial.println("File encrypted successfully.");
+    //Serial.println("File encrypted successfully.");
 }
 
 
@@ -128,7 +128,7 @@ void decryptFile(const char* inputfilename, const char* outputfilename){
     File outputfile = SD.open(outputfilename, FILE_WRITE);
 
     if (!inputfile || !outputfile){
-        Serial.println("Failed to open input/output files!");
+        //Serial.println("Failed to open input/output files!");
         return;
     }
 
@@ -161,7 +161,7 @@ void decryptFile(const char* inputfilename, const char* outputfilename){
 
     inputfile.close();
     outputfile.close();
-    Serial.println("File decrypted successfully.");
+    //Serial.println("File decrypted successfully.");
 }
 
 
@@ -175,7 +175,7 @@ decryptFile("/encrypted.txt", "/decrypted.txt");
 String readFileToJson(const char *filename) {
     File file = SD.open(filename, FILE_READ);
     if (!file){
-        Serial.println("Failed to open file for reading!");
+        //Serial.println("Failed to open file for reading!");
         return String("");
     }
 
@@ -186,7 +186,7 @@ String readFileToJson(const char *filename) {
     }
     file.close();
 
-    Serial.println("File content read successfully!");
+    //Serial.println("File content read successfully!");
 
     // 建立 JSON 資料結構
     StaticJsonDocument<256> jsonDoc;
