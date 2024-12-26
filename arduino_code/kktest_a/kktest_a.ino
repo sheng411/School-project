@@ -22,18 +22,18 @@ int current_byte_count = 0;  // 當前區塊中的總字節數
 //SD 接腳
 const int chipSelect = 5;
 using namespace std;
-/*
+
 //local
 const char* ssid = "kkESP32";
-const char* password = "987654321";
+const char* password = "123456789";
 WiFiServer server(3559);
 
 //connect
 const char* c_SSID = "shESP32";
-const char* c_Password = "987654321";
+const char* c_Password = "123456789";
 const int c_ServerPort = 3559;
 WiFiClient client;
-*/
+/*
 //local
 const char* ssid = "shESP32";
 const char* password = "123456789";
@@ -44,7 +44,7 @@ const char* c_SSID = "kkESP32";
 const char* c_Password = "123456789";
 const int c_ServerPort = 3559;
 WiFiClient client;
-
+*/
 
 
 
@@ -484,9 +484,26 @@ void receive_msg(String message){
     // 解密後清理原始訊息
     String decrypted = AES_Decryption(message);
     message.clear();
-    Serial.println(decrypted);
-    
+
+    StaticJsonDocument<256> doc;
+    DeserializationError error = deserializeJson(doc, decrypted);
+    String file_type = doc["file_type"];
+    const char* file_name = doc["file_name"];
+    const char* file_data = doc["file_data"];
+
+    if (!error && file_type=="txt") {
+        Serial.print("[[txt]file name]:");
+        Serial.println(file_name);
+        Serial.print("[[txt]file data]:");
+        Serial.println(file_data);
+    }
+    else{
+        Serial.print("解密後內容:");
+        Serial.println(decrypted);
+    }
+
     // 清理解密後的訊息和緩衝區
+    doc.clear();  // 清除舊資料
     decrypted.clear();
     memset(buffer_spase, 0, sizeof(buffer_spase));
     memset(r_msg, 0, sizeof(r_msg));
@@ -499,7 +516,7 @@ void receive_msg(String message){
 
 void receive_msg_txt(String message) {
     static uint8_t buffer_spase[16];
-    
+    Serial.println("01");
     // 解析 JSON
     StaticJsonDocument<256> doc;
     DeserializationError error = deserializeJson(doc, message);
@@ -507,8 +524,6 @@ void receive_msg_txt(String message) {
     if (!error) {
         const char* file_name = doc["file_name"];
         const char* file_data = doc["file_data"];
-        Serial.println(file_name);
-        Serial.println(file_data);
         Serial.println("02");
         
         if (file_name != nullptr && file_data != nullptr) {
@@ -575,9 +590,9 @@ void send_msg_txt() {
         String message = Serial.readStringUntil('\n');
         message.trim();
         if (!message.isEmpty()) {
-            DynamicJsonDocument doc(256);
+            StaticJsonDocument<256> doc;
             DeserializationError error = deserializeJson(doc, message);
-            Serial.println("1");
+            Serial.println("11");
             if (error) {
                 Serial.println("JSON parsing failed!");
                 Serial.println(error.f_str());
@@ -612,41 +627,33 @@ void send_msg_txt() {
 
 /**/
 void check_receive_message() {
-    static uint8_t buffer_spase[16];
     WiFiClient client = server.available();
     if (client) {
         while (client.connected()) {
             if (client.available()) {
                 String message = client.readStringUntil('\n');
                 
+                // 嘗試解析 JSON
                 StaticJsonDocument<256> doc;
-                doc.clear();  // 清除舊資料
                 DeserializationError error = deserializeJson(doc, message);
 
-                if (!error) {
-                    // 成功解析JSON
-                    if (doc.containsKey("file_type") && doc["file_type"] == "txt") {
-                        // 如果是檔案類型的JSON
+                if (!error && doc.containsKey("file_type")) {
+                    // 是 JSON 且包含 file_type
+                    if (doc["file_type"] == "txt") {
+                        //Serial.println("執行接收 txt 檔案");
                         receive_msg_txt(message);
                     }
-                    else{
-                        // 一般JSON訊息
-                        receive_msg(message);
-                    }
                 }
-                else{
-                    // 不是JSON格式
+                else {
+                    // 純文字訊息
+                    //Serial.println("執行一般訊息");
                     receive_msg(message);
                 }
-
-                memset(buffer_spase, 0, sizeof(buffer_spase));
-                memset(r_msg, 0, sizeof(r_msg));
+                doc.clear();  // 清除舊資料
                 client.flush();
             }
         }
         client.stop();
-        client.flush();
-        client = WiFiClient();
     }
 }
 
