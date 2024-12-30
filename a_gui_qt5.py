@@ -7,7 +7,7 @@ import serial
 import serial.tools.list_ports
 import json
 
-# v 8.8
+# v 8.9
 
 '''     環境設定     '''
 title_name = "computer-A"   # 視窗標題
@@ -715,7 +715,7 @@ class MainWindow(QtWidgets.QMainWindow):
                         print(f"已發送檔案: {self.current_file_path}")
                         delattr(self, 'current_file_path')
                         self.file_label.clear()
-                        self.file_label = QtWidgets.QLabel("未選擇檔案")
+                        self.file_label.setText("未選擇檔案")
             else:
                 print("未選擇檔案")
         except Exception as e:
@@ -801,14 +801,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 return False
             
             elif self.login_msg_ck2:
-                self.login_button.clicked.disconnect()  # 先斷開現有連接
-                #self.send_message(self.name_input.text())
-                self.text_input_selected()
-                self.login_msg_ck2=True
-                self.stop_listening()
-                self.start_listening()
-                print("登入檢查成功，已啟用聊天功能")
-                return True
+                pass
 
             # 如果條件都符合，連接按鈕事件
             self.login_button.clicked.disconnect()  # 先斷開現有連接
