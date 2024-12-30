@@ -7,13 +7,13 @@ import serial
 import serial.tools.list_ports
 import json
 
-# v 8.7
+# v 8.8
 
 '''     環境設定     '''
 title_name = "computer-A"   # 視窗標題
 window_size = (850, 650)    # width, height
-icon_path = os.path.join(os.path.dirname(__file__), "icon.png")     #先抓當前檔案的路徑,再加上icon
-background_path=os.path.join(os.path.dirname(__file__), "background.jpg")  #背景圖片
+icon_path = os.path.join(os.path.dirname(__file__), "frog_b.png")     #先抓當前檔案的路徑,再加上icon
+background_path=os.path.join(os.path.dirname(__file__), "background.png")  #背景圖片
 background_path_fixed = background_path.replace("\\", "/")  #斜線翻轉
 serial_baud=115200
 index_name="呱呱呱呱呱" #首頁標題
@@ -139,17 +139,6 @@ class MainWindow(QtWidgets.QMainWindow):
             }
         """)
 
-        # 提示文字
-        hint_label = QtWidgets.QLabel("請選擇模式")
-        hint_label.setAlignment(QtCore.Qt.AlignCenter)
-        hint_label.setStyleSheet("""
-            QLabel {
-                font-size: 24px;
-                color: #666666;
-                font-family: "Microsoft YaHei", "微軟正黑體";
-            }
-        """)
-
         # 建立序列埠控制區域
         port_control = QtWidgets.QHBoxLayout()
         
@@ -265,7 +254,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # 將標題和提示文字加入標題布局
         title_layout.addWidget(title_label)
-        title_layout.addWidget(hint_label)
         main_layout.addWidget(title_container)
         main_layout.addLayout(port_control)
         main_layout.addLayout(login_layout)
