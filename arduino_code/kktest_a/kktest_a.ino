@@ -23,6 +23,7 @@ int current_byte_count = 0;  // 當前區塊中的總字節數
 const int chipSelect = 5;
 using namespace std;
 
+
 //local
 const char* ssid = "kkESP32";
 const char* password = "123456789";
@@ -33,6 +34,7 @@ const char* c_SSID = "shESP32";
 const char* c_Password = "123456789";
 const int c_ServerPort = 3559;
 WiFiClient client;
+
 /*
 //local
 const char* ssid = "shESP32";
@@ -475,44 +477,63 @@ void receive_msg_txt() {
 }
 */
 
-void receive_msg(String message){
+void receive_msg(){
     static uint8_t buffer_spase[16];
+    WiFiClient client = server.available();
+    if (client) {
+        //Serial.println("Client connected");
+        while (client.connected()) {
+            if (client.available()) {
+                String message = client.readStringUntil('\n');
 
-    Serial.print("[receive encrypted message]:\n");
-    Serial.println(message);
+                Serial.print("[receive encrypted message]:\n");
+                Serial.println(message);
 
-    // 解密後清理原始訊息
-    String decrypted = AES_Decryption(message);
-    message.clear();
+                // 嘗試解析 JSON
+                StaticJsonDocument<256> doc;
+                DeserializationError error = deserializeJson(doc, message);
+                const char * file_name = doc["file_name"];
+                const char * file_data = doc["file_data"];
 
-    StaticJsonDocument<256> doc;
-    DeserializationError error = deserializeJson(doc, decrypted);
-    String file_type = doc["file_type"];
-    const char* file_name = doc["file_name"];
-    const char* file_data = doc["file_data"];
+                if (!error) {
+                    writeFileFromJson(message.c_str());
+                    decryptFile("/encrypted.txt", "/decrypted.txt");
+                    String jsonString = readFileToJson("/decrypted.txt");
 
-    if (!error && file_type=="txt") {
-        Serial.print("[[txt]file name]:");
-        Serial.println(file_name);
-        Serial.print("[[txt]file data]:");
-        Serial.println(file_data);
+                    StaticJsonDocument<256> doc1;
+                    DeserializationError error = deserializeJson(doc1, jsonString);
+                    //const char * file_name1 = doc1["file_name"];
+                    const char * file_data1 = doc1["file_data"];
+                    //Serial.print("[[txt]file name]:");
+                    //Serial.println(file_name1);
+                    Serial.print("[[txt]file data]:");
+                    Serial.println(file_data1);
+                }
+                else{
+                    String decrypted = AES_Decryption(message);
+                    message="";
+                    Serial.print("解密後內容:");
+                    Serial.println(decrypted);
+                    decrypted.clear();
+                }
+
+                // 清理解密後的訊息和緩衝區
+                doc.clear();  // 清除舊資料
+                
+                memset(buffer_spase, 0, sizeof(buffer_spase));
+                memset(r_msg, 0, sizeof(r_msg));
+                // clear the message buffer
+                message = "";
+                client.flush();
+            }
+        }
+        client.stop();
+        // 強制清理WiFi Client資源
+        client.flush();
+        client = WiFiClient();
+        //Serial.println("Client disconnected");
     }
-    else{
-        Serial.print("解密後內容:");
-        Serial.println(decrypted);
-    }
-
-    // 清理解密後的訊息和緩衝區
-    doc.clear();  // 清除舊資料
-    decrypted.clear();
-    memset(buffer_spase, 0, sizeof(buffer_spase));
-    memset(r_msg, 0, sizeof(r_msg));
-
-    // clear the message buffer
-    message = "";
 }
-
-
 
 void receive_msg_txt(String message) {
     static uint8_t buffer_spase[16];
@@ -559,14 +580,33 @@ void send_msg(){
         if (!message.isEmpty()) {
             //Serial.println("Sending to B:" + message);
             //Serial.println(message);
+            StaticJsonDocument<256> doc;
+            DeserializationError error = deserializeJson(doc, message);
+            String file_type = doc["file_type"];
+            String file_name = doc["file_name"];
+            String file_data = doc["file_data"];
+            Serial.println("11");
+            
             if (client.connect(WiFi.gatewayIP(), c_ServerPort)) {
-                String encrypted = AES_Encryption(message);
-                message.clear();
+                if (file_type == "txt") {
+                    Serial.print("not message:");
+                    Serial.println(message);
+                    String inputFile = writeFileFromJson(message.c_str());
+                    encryptFile(inputFile.c_str(), "/encrypted.txt");
+                    String encryptedJson = readFileToJson("/encrypted.txt");
+                    Serial.print("encryptfile-->");
+                    Serial.println(encryptedJson);
+                    client.println(encryptedJson);
+                }
+                else{
+                    String encrypted = AES_Encryption(message);
+                    client.println(encrypted);
+                    // 清理加密後的訊息
+                    encrypted="";
+                }
                 
-                client.println(encrypted);
-                // 清理加密後的訊息
-                encrypted.clear();
                 
+                message="";
                 // 清理緩衝區
                 memset(buffer_spase, 0, sizeof(buffer_spase));
                 memset(s_msg, 0, sizeof(s_msg));
@@ -580,80 +620,6 @@ void send_msg(){
                 Serial.println("Connection to B failed");
             }
         }
-    }
-}
-
-
-void send_msg_txt() {
-    static uint8_t buffer_spase[16];
-    if (Serial.available() > 0) {
-        String message = Serial.readStringUntil('\n');
-        message.trim();
-        if (!message.isEmpty()) {
-            StaticJsonDocument<256> doc;
-            DeserializationError error = deserializeJson(doc, message);
-            Serial.println("11");
-            if (error) {
-                Serial.println("JSON parsing failed!");
-                Serial.println(error.f_str());
-                return;
-            }
-
-            // 判斷 content_type
-            const char* content_type = doc["content_type"];
-            Serial.println("2");
-
-            if (strcmp(content_type, "file") == 0 && strcmp(doc["file_type"], "txt") == 0) {
-                // 處理 .txt 檔案，直接存儲 JSON 字串
-                String inputFile = writeFileFromJson(message.c_str());
-                encryptFile(inputFile.c_str(), "/encrypted.txt");
-                String encryptedJson = readFileToJson("/encrypted.txt");
-                
-                if (client.connect(WiFi.gatewayIP(), c_ServerPort)) {
-                    client.println(encryptedJson);
-                    client.flush();
-                    client.stop();
-                }
-                else{
-                    Serial.println("Connection to B failed");
-                }
-            }
-            else{
-                Serial.println("Unsupported content_type or file_type.");
-            }
-        }
-    }
-}
-
-/**/
-void check_receive_message() {
-    WiFiClient client = server.available();
-    if (client) {
-        while (client.connected()) {
-            if (client.available()) {
-                String message = client.readStringUntil('\n');
-                
-                // 嘗試解析 JSON
-                StaticJsonDocument<256> doc;
-                DeserializationError error = deserializeJson(doc, message);
-
-                if (!error && doc.containsKey("file_type")) {
-                    // 是 JSON 且包含 file_type
-                    if (doc["file_type"] == "txt") {
-                        //Serial.println("執行接收 txt 檔案");
-                        receive_msg_txt(message);
-                    }
-                }
-                else {
-                    // 純文字訊息
-                    //Serial.println("執行一般訊息");
-                    receive_msg(message);
-                }
-                doc.clear();  // 清除舊資料
-                client.flush();
-            }
-        }
-        client.stop();
     }
 }
 
@@ -701,8 +667,8 @@ void loop() {
 
     send_msg();    
     delay(10);
-    send_msg_txt();
-    delay(10);
-    check_receive_message();
+    /*send_msg_txt();
+    delay(10);*/
+    receive_msg();
     delay(10);
 }

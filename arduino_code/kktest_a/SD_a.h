@@ -36,18 +36,34 @@ String writeFileFromJson(const char *jsonString){
     // 打開 SD 卡文件進行寫入
     File file = SD.open(fullFileName.c_str(), FILE_WRITE);
     if (!file){
-        //Serial.println("Failed to open file for writing!");
+        //Serial.print("[sd]Failed to open file: ");
+        //Serial.println(fullFileName);
         return String("");
     }
 
     // 寫入文件內容並檢查結果
-    /*if (file.print(fileData) == 0)
+    size_t bytesWritten = file.print(fileData);
+    if (bytesWritten == 0) {
+        //Serial.print("[sd]Failed to write data to file: ");
+        //Serial.println(fullFileName);
+        file.close();
+        return String("");
+    }
+    else {
+        //Serial.print("[sd]Data written successfully! Bytes: ");
+        //Serial.println(bytesWritten);
+        //Serial.print("[sd]File: ");
+        //Serial.println(fullFileName);
+    }
+/*
+    // 寫入文件內容並檢查結果
+    if (file.print(fileData) == 0)
         //Serial.println("Failed to write data to file!");
     else{
         Serial.print("Data written to file successfully! File: ");
         Serial.println(fullFileName);
-    }*/
-
+    }
+*/
     file.close();
 
     return fullFileName;
@@ -195,10 +211,10 @@ String readFileToJson(const char *filename) {
     //jsonDoc["file_size"] = fileContent.length(); // 設定檔案大小
     jsonDoc["file_data"] = fileContent;       // 設定檔案內容
 
-    Serial.print("[[txt]file name]:");
+    /*Serial.print("[sd[txt]file name]:");
     Serial.println(filename);
-    Serial.print("[[txt]file data]:");
-    Serial.println(fileContent);
+    Serial.print("[sd[txt]file data]:");
+    Serial.println(fileContent);*/
 
     // 將 JSON 資料轉換為字串
     String jsonString;
